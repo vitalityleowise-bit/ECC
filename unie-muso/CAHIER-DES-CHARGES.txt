@@ -58,3 +58,13 @@ F. RETOURS APRÈS INSTALLATION (26/11/2026)
       À corriger : l'ouverture doit aussi marcher depuis l'application Fichiers,
       Gmail, Bluetooth, Google Drive, etc. (filtre d'ouverture Android plus large
       + vérification du contenu avant import).
+
+G. DÉCISIONS VALIDÉES
+   1. Tous les membres de la mutuelle voient le résumé du rapport mensuel
+      (pas seulement le comité). FAIT en version 3.2 : affiché dans « Mon compte »,
+      avec choix du mois, plein écran et lien vers le rapport complet.
+      À garder dans la version en ligne (A).
+   2. Tout l'argent de la mutuelle est à la Banque CAP-AIDER (mode par défaut).
+   3. Un membre du comité ne note ni ne décide sa propre demande de crédit.
+   4. Le résumé du rapport est un texte rédigé (actif, passif, capitaux, produits,
+      charges, crédit, points d'attention), modifiable par le trésorier.
