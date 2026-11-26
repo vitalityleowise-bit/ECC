@@ -111,35 +111,12 @@ PAGES.rapport = function () {
   if (DB.demandes_pret.some((d) => d.statut === 'En attente')) reco.push('Des demandes de prêt attendent l’évaluation du comité.');
   if (!reco.length) reco.push('Situation saine : continuer le suivi régulier des cotisations et des remboursements.');
 
-  // Résumé noté (fenêtre + rapport + texte WhatsApp) : chaque point a une appréciation et un commentaire
+  // Résumé rédigé du rapport (texte de présentation en réunion)
   const enCours = DB.prets.filter((x) => x.status !== 'Remboursé' && parseD(x.date) <= to);
   const dues = []; enCours.forEach((x) => loanSchedule(x).forEach((r) => { if (r.due >= from && r.due <= to) dues.push(r); }));
-  const duesPaid = dues.filter((r) => r.payment).length;
-  const attendu = actifs.length * COT();
-  const tauxPres = att.length ? (att.length - absents.length) / att.length : 0;
-  const items = [
-    { id: 'reunion', label: 'Réunion', value: heldMeeting ? longDate(meet) + ' — ' + (att.length - absents.length) + ' présent(s) sur ' + att.length + ' (' + Math.round(tauxPres * 100) + ' %)' : 'aucune réunion enregistrée (prévue le ' + longDate(meet) + ')',
-      auto: !heldMeeting ? 'surveiller' : tauxPres >= 0.9 ? 'bon' : tauxPres >= 0.75 ? 'surveiller' : 'probleme' },
-    { id: 'absents', label: 'Absents', value: heldMeeting ? (absents.length ? absents.map((x) => memberName(x.m)).join(', ') : 'aucun') + (retards.length ? ' · retards : ' + retards.map((x) => memberName(x.m)).join(', ') : '') : '—',
-      auto: !heldMeeting ? 'info' : absents.length === 0 ? 'bon' : absents.length <= 2 ? 'surveiller' : 'probleme' },
-    { id: 'cotisations', label: 'Cotisations du mois', value: money(totCot) + ' sur ' + money(attendu) + ' attendus (' + (attendu ? Math.round(totCot / attendu * 100) : 0) + ' %) · ' + cots.length + ' versements — Verte ' + fmt(sum(cots, (c) => c.verte)) + ', Rouge ' + fmt(sum(cots, (c) => c.rouge)),
-      auto: !attendu ? 'info' : totCot >= attendu ? 'bon' : totCot >= attendu * 0.8 ? 'surveiller' : 'probleme' },
-    { id: 'amendes', label: 'Amendes encaissées', value: money(sum(am, (x) => x.montant)) + ' (' + am.length + ')', auto: 'info' },
-    { id: 'remboursements', label: 'Remboursements de prêts', value: money(sum(rmb, (x) => x.montant)) + ' dont ' + money(sum(rmb, (x) => x.int)) + ' d’intérêts' + (dues.length ? ' · ' + duesPaid + '/' + dues.length + ' mensualité(s) du mois payée(s)' : ''),
-      auto: !dues.length ? 'info' : duesPaid === dues.length ? 'bon' : duesPaid > 0 ? 'surveiller' : 'probleme' },
-    { id: 'nouveaux_prets', label: 'Nouveaux prêts', value: pretsM.length ? pretsM.length + ' — ' + money(sum(pretsM, (x) => x.capital)) + ' (' + pretsM.map((x) => nameOf(x.code_membre)).join(', ') + ')' : 'aucun', auto: 'info' },
-    { id: 'demandes', label: 'Demandes de prêt', value: demM.length ? demM.length + ' (' + demM.filter((d) => d.statut === 'Approuvée').length + ' approuvée(s), ' + demM.filter((d) => d.statut === 'En attente').length + ' en attente)' : 'aucune',
-      auto: demM.some((d) => d.statut === 'En attente') ? 'surveiller' : 'info' },
-    { id: 'prets_cours', label: 'Prêts en cours', value: enCours.length + ' — reste à rembourser ' + money(sum(enCours, (x) => loanTotals(x).reste)) + (lateLoans.length ? ' · ' + lateLoans.length + ' avec retard' : ''),
-      auto: lateLoans.length ? 'probleme' : enCours.length ? 'bon' : 'info' },
-    { id: 'banque', label: 'Banque CAP-AIDER', value: money(T.banque) + (T.caisse ? ' · liquidité en caisse ' + money(T.caisse) : ''),
-      auto: T.banque < 0 ? 'probleme' : T.caisse > 0 ? 'surveiller' : 'bon' },
-    { id: 'caisses', label: 'Caisse Verte / Rouge', value: money(T.verteFonds) + ' / ' + money(T.rougeFonds), auto: T.rougeFonds < 0 || T.verteFonds < 0 ? 'probleme' : 'bon' },
-    { id: 'resultat', label: 'Actif et résultat', value: 'actif ' + money(T.actif) + ' · résultat du mois ' + money(F.resultat), auto: F.resultat >= 0 ? 'bon' : 'surveiller' },
-    { id: 'retards', label: 'Membres en retard', value: enRetard.length ? enRetard.length + ' — ' + money(sum(enRetard, (x) => x.reste)) + ' : ' + enRetard.map((x) => memberName(x.member)).join(', ') : 'aucun',
-      auto: enRetard.length === 0 ? 'bon' : enRetard.length <= 3 ? 'surveiller' : 'probleme' },
-  ];
-  window.__rapportResume = { key, title: 'Résumé — ' + monthLabel(key), items, reco };
+  const prevKey = monthKey(new Date(y, m - 2, 1));
+  const prevCot = sum(DB.cotisations.filter((c) => monthKey(c.date) === prevKey), (c) => num(c.verte) + num(c.rouge));
+  window.__rapportResume = { key, ctx: { from, to, meet, heldMeeting, att, absents, retards, actifs, cots, totCot, am, rmb, pretsM, demM, enCours, dues, situ, enRetard, lateLoans, T, F, reco, prevKey, prevCot } };
   const sec = (n, title, body) => '<h2>' + n + '. ' + esc(title) + '</h2>' + body;
   return '<div class="no-print">' + pageHead('Rapports', t('rapport'), 'Modèle en 9 sections, prêt à imprimer ou enregistrer en PDF',
     '<select data-change="rmonth">' + months.slice().reverse().map((k) => '<option value="' + k + '"' + (k === key ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
@@ -150,7 +127,7 @@ PAGES.rapport = function () {
       sec(1, 'Résumé', '<div class="kpis">' + kpi('Membres actifs', actifs.length, '', 'navy') + kpi('Cotisations du mois', fmt(totCot), cots.length + ' versements', 'green') +
         kpi('Actif total', fmt(T.actif), 'fin de mois', 'navy') + kpi('Résultat du mois', fmt(F.resultat), '', F.resultat >= 0 ? 'green' : 'red') + '</div>' +
         '<p>Au ' + fmtD(to) + ', la mutuelle dispose de ' + money(T.banque) + ' à la banque CAP-AIDER' + (T.caisse ? ' et ' + money(T.caisse) + ' en caisse' : '') + ', et de ' + money(T.prets) + ' de prêts en cours auprès des membres. La Caisse Verte s’élève à ' + money(T.verteFonds) + ' et la Caisse Rouge à ' + money(T.rougeFonds) + '.</p>' +
-        resumeTable(window.__rapportResume, false)) +
+        '<div style="margin-top:12px">' + resumeBody(window.__rapportResume, false) + '</div>') +
       sec(2, 'Bilan au ' + fmtD(to), bilanHTML(to)) +
       sec(3, 'État des résultats du mois', resultatsHTML(from, to)) +
       sec(4, 'Cotisations collectées', table(['Date', 'Membre', ['Verte', 'n'], ['Rouge', 'n'], ['Total', 'n'], 'Mode'], cots.sort(sortByCode).map((c) =>
@@ -175,66 +152,132 @@ PAGES.rapport = function () {
       '<div class="sig"><div>' + esc(SETTINGS.sign_presidente) + '<br>Présidente</div><div>' + esc(SETTINGS.sign_tresorier) + '<br>Trésorier</div></div>' +
     '</article>';
 };
-/* ---------- Résumé noté du rapport ---------- */
-const APPRECIATIONS = {
-  bon: { l: 'Bon', c: 'b-green' }, surveiller: { l: 'À surveiller', c: 'b-orange' }, probleme: { l: 'Problème', c: 'b-red' }, info: { l: 'Info', c: 'b-grey' },
-};
-function resumeNotes(key) { SETTINGS.resume_notes = SETTINGS.resume_notes || {}; return SETTINGS.resume_notes[key] || { items: {}, global: '', globalLevel: '' }; }
-function itemLevel(r, it) { const n = resumeNotes(r.key).items[it.id]; return (n && n.level) || it.auto; }
-function autoGlobalLevel(r) {
-  const lv = r.items.map((it) => itemLevel(r, it));
-  return lv.includes('probleme') ? 'probleme' : lv.includes('surveiller') ? 'surveiller' : 'bon';
+/* ---------- Résumé rédigé du rapport mensuel ----------
+   Texte de présentation généré à partir des comptes (actif, passif, produits, charges), modifiable par le trésorier. */
+function pct(a, b) { return b ? Math.round((a / b) * 100) : 0; }
+function accLine(x) { return accLabel(x.acc) + ' (' + x.acc + ') : ' + money(x.v); }
+function joinList(arr) { return arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + ' et ' + arr[arr.length - 1]; }
+function resumeBlocks(r) {
+  const c = r.ctx; const T = c.T; const F = c.F; const mois = monthLabel(r.key).toLowerCase();
+  const fin = fmtD(c.to); const B = [];
+  const actif = F.actif.filter((x) => x.v); const prod = F.produits.filter((x) => x.v); const chg = F.charges.filter((x) => x.v);
+  const verteEpargne = (F.capitaux.find((x) => x.acc === 3010) || { v: 0 }).v;
+  B.push({ h: '1. Situation générale' });
+  B.push({ p: 'Au ' + fin + ', UNIE-MUSO compte ' + c.actifs.length + ' membres actifs sur ' + DB.members.length + ' inscrits. ' +
+    (c.heldMeeting ? 'La réunion mensuelle du ' + longDate(c.meet) + ' a réuni ' + (c.att.length - c.absents.length) + ' membres sur ' + c.att.length + ', soit un taux de présence de ' + pct(c.att.length - c.absents.length, c.att.length) + ' %' +
+      (c.absents.length ? ' ; ' + c.absents.length + ' membre(s) étaient absents (' + joinList(c.absents.map((x) => memberName(x.m))) + ')' : ' ; aucun membre n’était absent') +
+      (c.retards.length ? ' et ' + c.retards.length + ' sont arrivés en retard' : '') + '.'
+      : 'Aucune réunion n’a été enregistrée pour le mois de ' + mois + ' (réunion prévue le ' + longDate(c.meet) + ').') });
+  B.push({ h: '2. Situation patrimoniale (bilan au ' + fin + ')' });
+  B.push({ p: 'Le total de l’actif s’élève à ' + money(F.totActif) + '. Il se compose de : ' + joinList(actif.map(accLine)) + '. ' +
+    (T.caisse ? 'Une liquidité de ' + money(T.caisse) + ' reste en caisse et devra être déposée à CAP-AIDER. ' : 'Toute la trésorerie de la mutuelle est déposée à la banque CAP-AIDER. ') +
+    'Les prêts aux membres représentent ' + pct(T.prets, F.totActif) + ' % de l’actif.' });
+  B.push({ p: 'Au passif, ' + (F.totPassif - sum(F.capitaux, (x) => x.v) ? 'les dettes envers des tiers s’élèvent à ' + money(F.totPassif - sum(F.capitaux, (x) => x.v)) + '. ' : 'la mutuelle n’a aucune dette envers des tiers (classe 2 : 0 HTG). ') +
+    'Les capitaux propres atteignent ' + money(sum(F.capitaux, (x) => x.v)) + ' : l’épargne des membres déposée en Caisse Verte (compte 3010) pour ' + money(verteEpargne) + ', et le résultat de l’exercice (compte 3090) pour ' + money((F.capitaux.find((x) => x.acc === 3090) || { v: 0 }).v) + '. ' +
+    (Math.abs(F.totActif - F.totPassif) < 0.01 ? 'Le bilan est équilibré (' + money(F.totActif) + ' à l’actif comme au passif).' : 'Attention : le bilan présente un écart de ' + money(F.totActif - F.totPassif) + '.') });
+  B.push({ table: 'bilan' });
+  B.push({ h: '3. Résultat du mois (' + mois + ')' });
+  B.push({ p: 'Les produits du mois s’élèvent à ' + money(F.totP) + (prod.length ? ' : ' + joinList(prod.map(accLine)) : '') + '. ' +
+    'Les charges s’élèvent à ' + money(F.totC) + (chg.length ? ' : ' + joinList(chg.map(accLine)) : ' (aucune dépense ce mois-ci)') + '. ' +
+    'Le mois se solde par ' + (F.resultat >= 0 ? 'un excédent' : 'un déficit') + ' de ' + money(Math.abs(F.resultat)) + '. Depuis le début de l’activité, le résultat cumulé est de ' + money(F.resultatCum) + '.' });
+  B.push({ table: 'resultat' });
+  B.push({ h: '4. Cotisations' });
+  const attendu = c.actifs.length * COT();
+  B.push({ p: money(c.totCot) + ' ont été collectés en ' + c.cots.length + ' versements (Caisse Verte ' + money(sum(c.cots, (x) => x.verte)) + ', Caisse Rouge ' + money(sum(c.cots, (x) => x.rouge)) + '), soit ' + pct(c.totCot, attendu) + ' % de la cotisation mensuelle attendue (' + money(attendu) + ' pour ' + c.actifs.length + ' membres actifs). ' +
+    (c.prevCot ? 'Par rapport à ' + monthLabel(c.prevKey).toLowerCase() + ' (' + money(c.prevCot) + '), la collecte ' + (c.totCot >= c.prevCot ? 'progresse de ' : 'recule de ') + pct(Math.abs(c.totCot - c.prevCot), c.prevCot) + ' %. ' : '') +
+    'Les amendes encaissées ce mois s’élèvent à ' + money(sum(c.am, (x) => x.montant)) + ' (' + c.am.length + ').' });
+  B.push({ h: '5. Crédit' });
+  B.push({ p: (c.pretsM.length ? c.pretsM.length + ' prêt(s) ont été octroyés ce mois pour ' + money(sum(c.pretsM, (x) => x.capital)) + ' (' + joinList(c.pretsM.map((x) => nameOf(x.code_membre))) + '). ' : 'Aucun nouveau prêt n’a été octroyé ce mois. ') +
+    'À la fin du mois, ' + c.enCours.length + ' prêt(s) sont en cours, avec ' + money(T.prets) + ' de capital restant dû (compte 1210) et ' + money(sum(c.enCours, (x) => loanTotals(x).reste)) + ' restant à rembourser, intérêts compris. ' +
+    (c.dues.length ? c.dues.filter((x) => x.payment).length + ' mensualité(s) sur ' + c.dues.length + ' arrivées à échéance ce mois ont été payées. ' : '') +
+    'Les remboursements reçus s’élèvent à ' + money(sum(c.rmb, (x) => x.montant)) + ', dont ' + money(sum(c.rmb, (x) => x.int)) + ' d’intérêts. ' +
+    (c.lateLoans.length ? c.lateLoans.length + ' prêt(s) présentent des mensualités en retard. ' : 'Aucun prêt ne présente de retard. ') +
+    (c.demM.length ? c.demM.length + ' demande(s) de prêt ont été déposées ce mois (' + c.demM.filter((d) => d.statut === 'Approuvée').length + ' approuvée(s), ' + c.demM.filter((d) => d.statut === 'En attente').length + ' en attente).' : '') });
+  B.push({ h: '6. Fonds de la mutuelle' });
+  B.push({ p: 'La Caisse Verte s’élève à ' + money(T.verteFonds) + ', dont ' + money(T.prets) + ' prêtés aux membres ; ' + money(T.verteDispo) + ' restent disponibles pour de nouveaux crédits. ' +
+    'La Caisse Rouge (solidarité) s’élève à ' + money(T.rougeFonds) + ' ; selon le règlement, une aide de solidarité ne peut dépasser 15 % de cette caisse, soit ' + money(T.rougeFonds * 0.15) + ' actuellement.' });
+  B.push({ h: '7. Points d’attention' });
+  B.push({ p: (c.enRetard.length ? c.enRetard.length + ' membre(s) ne sont pas à jour de leurs cotisations pour un total de ' + money(sum(c.enRetard, (x) => x.reste)) + ' : ' + joinList(c.enRetard.map((x) => memberName(x.member) + ' (' + money(x.reste) + ')')) + '. ' : 'Tous les membres actifs sont à jour de leurs cotisations. ') +
+    (sum(c.situ, (x) => x.amendesDues) ? 'Les amendes restant à percevoir totalisent ' + money(sum(c.situ, (x) => x.amendesDues)) + '.' : 'Aucune amende ne reste à percevoir.') });
+  B.push({ h: '8. Conclusion et recommandations' });
+  c.reco.forEach((x, i) => B.push({ p: (i + 1) + '. ' + x }));
+  return B;
 }
-function globalLevel(r) { return resumeNotes(r.key).globalLevel || autoGlobalLevel(r); }
-function apprBadge(level, auto) {
-  const a = APPRECIATIONS[level] || APPRECIATIONS.info;
-  return '<span class="badge ' + a.c + '">' + a.l + '</span>' + (auto && auto !== level ? ' <span class="muted" style="font-size:10.5px">(auto : ' + APPRECIATIONS[auto].l + ')</span>' : '');
+function resumeTables(kind, r) {
+  const F = r.ctx.F; const line = (x) => '<tr><td class="code">' + x.acc + '</td><td>' + esc(accLabel(x.acc)) + '</td><td class="n">' + fmt(x.v) + '</td></tr>';
+  if (kind === 'bilan') {
+    return '<div class="grid-2" style="margin:6px 0 12px">' +
+      table(['Compte', 'Actif', ['HTG', 'n']], F.actif.map(line), '<tr><td colspan="2">Total actif</td><td class="n">' + fmt(F.totActif) + '</td></tr>') +
+      table(['Compte', 'Passif et capitaux propres', ['HTG', 'n']], F.passif.concat(F.capitaux).map(line), '<tr><td colspan="2">Total passif</td><td class="n">' + fmt(F.totPassif) + '</td></tr>') + '</div>';
+  }
+  return '<div class="grid-2" style="margin:6px 0 12px">' +
+    table(['Compte', 'Produits du mois', ['HTG', 'n']], F.produits.map((x) => line({ acc: x.acc, v: x.v })), '<tr><td colspan="2">Total produits</td><td class="n">' + fmt(F.totP) + '</td></tr>') +
+    table(['Compte', 'Charges du mois', ['HTG', 'n']], F.charges.length ? F.charges.map((x) => line({ acc: x.acc, v: x.v })) : ['<tr><td colspan="3" class="muted">Aucune charge</td></tr>'], '<tr><td colspan="2">Résultat</td><td class="n">' + fmt(F.resultat) + '</td></tr>') + '</div>';
 }
-/* Tableau du résumé : lecture seule (rapport, membres) ou éditable (trésorier) */
-function resumeTable(r, editable) {
+/* Texte personnalisé du trésorier (par mois) : « ## » = titre, ligne vide = nouveau paragraphe */
+function customResume(key) { return (SETTINGS.resume_text || {})[key] || ''; }
+function blocksToText(B) { return B.filter((b) => !b.table).map((b) => (b.h ? '## ' + b.h : b.p)).join('\n\n'); }
+function textToBlocks(txt) {
+  const out = [];
+  txt.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean).forEach((para) => {
+    if (para.startsWith('## ')) {
+      const h = para.split('\n')[0].slice(3); out.push({ h });
+      // Les tableaux des comptes s'affichent à la fin des parties 2 (bilan) et 3 (résultat)
+      if (/^2\./.test(h)) out.push({ table: 'bilan' });
+      if (/^3\./.test(h)) out.push({ table: 'resultat' });
+      const rest = para.split('\n').slice(1).join(' ').trim(); if (rest) out.push({ p: rest });
+    } else out.push({ p: para.replace(/\n/g, ' ') });
+  });
+  return out;
+}
+function currentBlocks(r) { const c = customResume(r.key); return c ? textToBlocks(c) : resumeBlocks(r); }
+function resumeBody(r, withHead) {
   if (!r) return '';
-  const notes = resumeNotes(r.key);
-  const opts = Object.keys(APPRECIATIONS).map((k) => ({ v: k, l: APPRECIATIONS[k].l }));
-  const rows = r.items.map((it) => {
-    const n = notes.items[it.id] || {}; const level = n.level || it.auto;
-    return '<tr><td style="font-weight:600;white-space:nowrap">' + esc(it.label) + '</td><td>' + esc(it.value) + '</td>' +
-      '<td style="white-space:nowrap">' + (editable ? select('lvl_' + it.id, opts, level) + '<div class="muted" style="font-size:10.5px">auto : ' + APPRECIATIONS[it.auto].l + '</div>' : apprBadge(level)) + '</td>' +
-      '<td>' + (editable ? '<textarea name="note_' + it.id + '" rows="2" style="width:100%;min-width:180px;padding:5px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" placeholder="Commentaire du trésorier">' + esc(n.note || '') + '</textarea>' : esc(n.note || '')) + '</td></tr>';
-  }).join('');
-  const g = globalLevel(r);
-  return '<div class="tbl-wrap" style="margin-top:10px"><table class="tbl"><thead><tr><th>Point</th><th>Constat</th><th>Appréciation</th><th>Commentaire</th></tr></thead><tbody>' + rows + '</tbody>' +
-    '<tfoot><tr><td>Appréciation générale</td><td>' + (editable ? '<textarea name="global" rows="2" style="width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:5px;font-size:12px" placeholder="Commentaire général du mois">' + esc(notes.global || '') + '</textarea>' : esc(notes.global || '')) + '</td>' +
-    '<td>' + (editable ? select('globalLevel', [{ v: '', l: 'Automatique (' + APPRECIATIONS[autoGlobalLevel(r)].l + ')' }].concat(opts), notes.globalLevel || '') : apprBadge(g)) + '</td><td></td></tr></tfoot></table></div>';
+  const B = currentBlocks(r);
+  // Les tableaux suivent le paragraphe de leur section
+  const html = []; let pendingTable = null;
+  B.forEach((b) => {
+    if (b.table) { pendingTable = b.table; return; }
+    if (b.h && pendingTable) { html.push(resumeTables(pendingTable, r)); pendingTable = null; }
+    html.push(b.h ? '<h4 style="margin:16px 0 6px;color:var(--navy);font-size:13.5px">' + esc(b.h) + '</h4>' : '<p style="margin:0 0 8px;line-height:1.65;text-align:justify">' + esc(b.p) + '</p>');
+  });
+  if (pendingTable) html.push(resumeTables(pendingTable, r));
+  return (withHead ? '<div class="report-head" style="margin-bottom:10px">' + logoImg() + '<div><div class="t1">UNIE-MUSO</div><div class="t2">Résumé du rapport mensuel — ' + esc(monthLabel(r.key)) + '</div></div>' +
+    '<div class="t3">Présenté par<br><b>' + esc(SETTINGS.sign_tresorier) + '</b><br>Trésorier</div></div>' : '') +
+    html.join('') +
+    (withHead ? '<div class="sig"><div>' + esc(SETTINGS.sign_presidente) + '<br>Présidente</div><div>' + esc(SETTINGS.sign_tresorier) + '<br>Trésorier</div></div>' : '');
 }
 function resumeText(r) {
-  const notes = resumeNotes(r.key);
-  return 'UNIE-MUSO — Résumé du rapport ' + monthLabel(r.key) + '\n' + 'Appréciation générale : ' + APPRECIATIONS[globalLevel(r)].l + (notes.global ? ' — ' + notes.global : '') + '\n\n' +
-    r.items.map((it) => { const n = notes.items[it.id] || {}; return '• ' + it.label + ' [' + APPRECIATIONS[n.level || it.auto].l + '] : ' + it.value + (n.note ? '\n   → ' + n.note : ''); }).join('\n') +
-    '\n\nRecommandations :\n' + r.reco.map((x, i) => (i + 1) + '. ' + x).join('\n') + '\n\n' + SETTINGS.sign_tresorier + ', Trésorier';
-}
-function resumeHTML(r, editable) {
-  return '<div class="report-head" style="margin-bottom:6px">' + logoImg() + '<div><div class="t1">UNIE-MUSO</div><div class="t2">Résumé du rapport — ' + esc(monthLabel(r.key)) + '</div></div>' +
-    '<div class="t3">Appréciation générale<br>' + apprBadge(globalLevel(r)) + '</div></div>' + resumeTable(r, editable) +
-    '<h4 style="margin:16px 0 6px;color:var(--navy)">Recommandations</h4><ol style="margin:0;padding-left:20px">' + r.reco.map((x) => '<li style="margin-bottom:4px">' + esc(x) + '</li>').join('') + '</ol>';
+  return 'UNIE-MUSO — Résumé du rapport mensuel, ' + monthLabel(r.key) + '\n\n' +
+    currentBlocks(r).filter((b) => !b.table).map((b) => (b.h ? '*' + b.h + '*' : b.p)).join('\n\n') + '\n\n' + SETTINGS.sign_tresorier + ', Trésorier';
 }
 ACTIONS.rapportResume = () => {
   const r = window.__rapportResume; if (!r) return;
-  const editable = canEdit();
   openModal({
-    title: r.title, wide: true, body: '<div id="resume-box">' + resumeHTML(r, editable) + '</div>' +
-      (editable ? '<div class="muted" style="margin-top:8px">Les appréciations sont proposées automatiquement à partir des chiffres ; vous pouvez les changer et ajouter vos commentaires. Les membres voient ce résumé en lecture seule.</div>' : ''),
-    submit: editable ? t('save') : null,
-    footLeft: '<button type="button" class="btn btn-accent" data-act="resumeCopy">Copier pour WhatsApp</button><button type="button" class="btn" data-act="resumePrint">' + t('print') + '</button>',
-    onSubmit: editable ? (v) => {
-      const n = { items: {}, global: (v.global || '').trim(), globalLevel: v.globalLevel || '' };
-      r.items.forEach((it) => {
-        const level = v['lvl_' + it.id]; const note = (v['note_' + it.id] || '').trim();
-        if (level !== it.auto || note) n.items[it.id] = { level: level === it.auto ? '' : level, note };
-      });
-      SETTINGS.resume_notes = Object.assign({}, SETTINGS.resume_notes, { [r.key]: n });
-      saveSettings(); toast('Résumé de ' + monthLabel(r.key) + ' enregistré.', 'ok'); render();
-    } : null,
+    title: 'Résumé du rapport — ' + monthLabel(r.key), wide: true,
+    body: '<div class="report" style="padding:20px 24px;border:0">' + resumeBody(r, true) + '</div>' +
+      (customResume(r.key) ? '<div class="muted" style="margin-top:6px">Texte modifié par le trésorier.</div>' : ''),
+    footLeft: '<button type="button" class="btn btn-accent" data-act="resumeCopy">Copier pour WhatsApp</button><button type="button" class="btn" data-act="resumePrint">' + t('print') + ' / PDF</button>' +
+      (canEdit() ? '<button type="button" class="btn" data-act="resumeEdit">Modifier le texte</button>' : ''),
   });
+};
+ACTIONS.resumeEdit = () => {
+  const r = window.__rapportResume;
+  openModal({
+    title: 'Modifier le résumé — ' + monthLabel(r.key), wide: true, submit: t('save'),
+    body: field('Texte du résumé', '<textarea name="txt" style="min-height:60vh;font-size:12.5px;line-height:1.55">' + esc(customResume(r.key) || blocksToText(resumeBlocks(r))) + '</textarea>', '',
+      '« ## » en début de ligne = titre de partie ; laissez une ligne vide entre deux paragraphes. Les tableaux des comptes restent ajoutés automatiquement aux parties 2 et 3.'),
+    footLeft: customResume(r.key) ? '<button type="button" class="btn btn-danger" data-act="resumeReset">Revenir au texte automatique</button>' : '',
+    onSubmit: (v) => {
+      SETTINGS.resume_text = Object.assign({}, SETTINGS.resume_text, { [r.key]: v.txt.trim() === blocksToText(resumeBlocks(r)).trim() ? '' : v.txt.trim() });
+      saveSettings(); toast('Résumé enregistré.', 'ok'); render(); setTimeout(() => ACTIONS.rapportResume(), 0);
+    },
+  });
+};
+ACTIONS.resumeReset = () => {
+  const r = window.__rapportResume;
+  SETTINGS.resume_text = Object.assign({}, SETTINGS.resume_text, { [r.key]: '' }); saveSettings();
+  closeModal(); render(); ACTIONS.rapportResume(); toast('Texte automatique rétabli.', 'ok');
 };
 ACTIONS.resumeCopy = () => {
   const txt = resumeText(window.__rapportResume);
@@ -247,7 +290,7 @@ function fallbackCopy(txt, done) {
   try { document.execCommand('copy'); done(); } catch (_e) { toast('Copie impossible : sélectionnez le texte manuellement.', 'err'); }
   ta.remove();
 }
-ACTIONS.resumePrint = () => printHTML(window.__rapportResume.title, '<div class="report">' + resumeHTML(window.__rapportResume, false) + '</div>');
+ACTIONS.resumePrint = () => printHTML('Résumé — ' + monthLabel(window.__rapportResume.key), '<div class="report">' + resumeBody(window.__rapportResume, true) + '</div>');
 ACTIONS.rmonth = (_i, el) => { STATE.rmonth = el.value; render(); };
 ACTIONS.rnote = (key, el) => { SETTINGS.report_notes = Object.assign({}, SETTINGS.report_notes, { [key]: el.value }); saveSettings(); toast('Remarques enregistrées.', 'ok'); render(); };
 
