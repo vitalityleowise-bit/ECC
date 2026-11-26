@@ -45,3 +45,16 @@ E. À NOTER
      serveur de la version en ligne (A) : ils seront faits ensemble.
    - En complément possible : bouton « Envoyer par WhatsApp » qui prépare le message
      (remerciement, rappel, montant dû) pour le membre concerné.
+
+F. RETOURS APRÈS INSTALLATION (26/11/2026)
+   1. Windows affiche « éditeur inconnu » au lancement (l'application fonctionne).
+      Cause : UNIE-MUSO.exe n'est pas signé numériquement. Reconstruire le fichier
+      ne change rien ; il faut une signature de code :
+        - certificat de signature de code (payant, environ 100 à 400 USD/an), ou
+        - publication sur le Microsoft Store (le Store signe l'application).
+      En attendant : « Informations complémentaires » > « Exécuter quand même ».
+   2. Android : un fichier de sauvegarde .unimiso s'ouvre directement dans
+      l'application seulement quand on le touche depuis WhatsApp.
+      À corriger : l'ouverture doit aussi marcher depuis l'application Fichiers,
+      Gmail, Bluetooth, Google Drive, etc. (filtre d'ouverture Android plus large
+      + vérification du contenu avant import).
