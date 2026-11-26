@@ -225,7 +225,8 @@ PAGES.cotisations = function () {
   if (f.month) list = list.filter((c) => monthKey(c.date) === f.month);
   list.sort((a, b) => (parseD(b.date) - parseD(a.date)) || a.code.localeCompare(b.code));
   const months = [...new Set(DB.cotisations.map((c) => monthKey(c.date)))].sort().reverse();
-  const rows = list.map((c) => '<tr><td class="num">' + esc(c.date) + '</td><td><span class="code">' + c.code + '</span> ' + esc(nameOf(c.code)) + '</td>' +
+  const sel = selSet('cot');
+  const rows = list.map((c) => '<tr' + (sel.has(c.i) ? ' class="row-sel"' : '') + '>' + (canEdit() ? '<td class="c"><input type="checkbox" aria-label="Sélectionner" data-change="selToggle" data-id="cot:' + c.i + '"' + (sel.has(c.i) ? ' checked' : '') + '></td>' : '') + '<td class="num">' + esc(c.date) + '</td><td><span class="code">' + c.code + '</span> ' + esc(nameOf(c.code)) + '</td>' +
     '<td class="n">' + fmt(c.verte) + '</td><td class="n">' + fmt(c.rouge) + '</td><td class="n">' + fmt(num(c.verte) + num(c.rouge)) + '</td><td>' + esc(c.mode) + '</td>' +
     '<td class="act"><button class="btn btn-sm" data-act="cotReceipt" data-id="' + c.i + '">Reçu</button>' +
     (canEdit() ? '<button class="btn btn-sm" data-act="cotEdit" data-id="' + c.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="cotDel" data-id="' + c.i + '">' + t('del') + '</button>' : '') + '</td></tr>');
@@ -234,12 +235,10 @@ PAGES.cotisations = function () {
     '<section class="panel"><div class="toolbar">' +
       '<select data-change="cotFilterCode"><option value="">Tous les membres</option>' + memberOptions().map((o) => '<option value="' + o.v + '"' + (f.code === o.v ? ' selected' : '') + '>' + esc(o.l) + '</option>').join('') + '</select>' +
       '<select data-change="cotFilterMonth"><option value="">Tous les mois</option>' + months.map((k) => '<option value="' + k + '"' + (f.month === k ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
-    '</div>' + table(['Date', 'Membre', ['Verte', 'n'], ['Rouge', 'n'], ['Total', 'n'], 'Mode', ''], rows,
-      '<tr><td colspan="2">Total</td><td class="n">' + fmt(sum(list, (c) => c.verte)) + '</td><td class="n">' + fmt(sum(list, (c) => c.rouge)) + '</td><td class="n">' + fmt(sum(list, (c) => num(c.verte) + num(c.rouge))) + '</td><td colspan="2"></td></tr>') + '</section>' +
-    panel('Amendes encaissées', table(['Date', 'Membre', ['Montant', 'n'], ''], DB.amendes_paid.map((a, i) => Object.assign({ i }, a)).sort((a, b) => parseD(b.date) - parseD(a.date)).map((a) =>
-      '<tr><td class="num">' + esc(a.date) + '</td><td><span class="code">' + a.code + '</span> ' + esc(nameOf(a.code)) + '</td><td class="n">' + fmt(a.montant) + '</td><td class="act">' +
-      (canEdit() ? '<button class="btn btn-sm btn-danger" data-act="amendeDel" data-id="' + a.i + '">' + t('del') + '</button>' : '') + '</td></tr>'),
-      '<tr><td colspan="2">Total</td><td class="n">' + fmt(sum(DB.amendes_paid, (a) => a.montant)) + '</td><td></td></tr>'), { flush: true });
+      modeSummary(list) + '</div>' + (canEdit() ? bulkBar('cot', list.map((c) => c.i)) : '') +
+      table((canEdit() ? [['', 'c']] : []).concat(['Date', 'Membre', ['Verte', 'n'], ['Rouge', 'n'], ['Total', 'n'], 'Mode', '']), rows,
+      '<tr>' + (canEdit() ? '<td></td>' : '') + '<td colspan="2">Total</td><td class="n">' + fmt(sum(list, (c) => c.verte)) + '</td><td class="n">' + fmt(sum(list, (c) => c.rouge)) + '</td><td class="n">' + fmt(sum(list, (c) => num(c.verte) + num(c.rouge))) + '</td><td colspan="2"></td></tr>') + '</section>' +
+    amendesPanel();
 };
 ACTIONS.cotFilterCode = (_i, el) => { STATE.filt = Object.assign({}, STATE.filt, { code: el.value }); render(); };
 ACTIONS.cotFilterMonth = (_i, el) => { STATE.filt = Object.assign({}, STATE.filt, { month: el.value }); render(); };
@@ -261,7 +260,7 @@ function saveCot(d, idx) {
 }
 ACTIONS.cotNew = () => openModal({ title: 'Nouvelle cotisation', body: cotForm(), submit: t('save'), onSubmit: (d) => saveCot(d) });
 ACTIONS.cotEdit = (i) => openModal({ title: 'Modifier la cotisation', body: cotForm(DB.cotisations[+i]), submit: t('save'), onSubmit: (d) => saveCot(d, +i) });
-ACTIONS.cotDel = (i) => { const c = DB.cotisations[+i]; confirmBox('Supprimer la cotisation', 'Supprimer la cotisation de <b>' + esc(nameOf(c.code)) + '</b> du ' + esc(c.date) + ' (' + money(num(c.verte) + num(c.rouge)) + ') ?', () => { DB.cotisations.splice(+i, 1); saveDB(); toast('Cotisation supprimée.', 'ok'); render(); }, t('del')); };
+ACTIONS.cotDel = (i) => { const c = DB.cotisations[+i]; confirmBox('Supprimer la cotisation', 'Supprimer la cotisation de <b>' + esc(nameOf(c.code)) + '</b> du ' + esc(c.date) + ' (' + money(num(c.verte) + num(c.rouge)) + ') ?', () => { DB.cotisations.splice(+i, 1); selSet('cot').clear(); saveDB(); toast('Cotisation supprimée.', 'ok'); render(); }, t('del')); };
 ACTIONS.cotReceipt = (i) => {
   const c = DB.cotisations[+i];
   openModal({
@@ -322,7 +321,7 @@ ACTIONS.attendanceSheet = () => {
     },
   });
 };
-ACTIONS.amendeDel = (i) => confirmBox('Supprimer l’amende', 'Supprimer cette amende ?', () => { DB.amendes_paid.splice(+i, 1); saveDB(); render(); }, t('del'));
+ACTIONS.amendeDel = (i) => confirmBox('Supprimer l’amende', 'Supprimer cette amende ?', () => { DB.amendes_paid.splice(+i, 1); selSet('am').clear(); saveDB(); render(); }, t('del'));
 
 /* ---------- Prévisions (prochaine réunion) ---------- */
 PAGES.previsions = function () {
@@ -349,5 +348,67 @@ ACTIONS.adjustMonths = (delta) => {
   const n = Math.max(0, num(RULES.nb_cotisations_attendues) + num(delta));
   confirmBox('Nombre de cotisations attendues', 'Passer de <b>' + RULES.nb_cotisations_attendues + '</b> à <b>' + n + '</b> cotisations attendues (attendu à jour : ' + money(n * COT()) + ') ?', () => {
     RULES.nb_cotisations_attendues = n; saveRules(); toast('Nombre de mois ajusté : ' + n, 'ok'); render();
+  });
+};
+
+/* ---------- Correction du mode de paiement (Banque CAP-AIDER / Liquidité) ---------- */
+/* Sélection par liste : 'cot' (cotisations) ou 'am' (amendes) ; indices dans DB */
+function selSet(kind) { STATE.sel = STATE.sel || {}; STATE.sel[kind] = STATE.sel[kind] || new Set(); return STATE.sel[kind]; }
+function selArray(kind) { return kind === 'cot' ? DB.cotisations : DB.amendes_paid; }
+function modeSummary(list) {
+  const bank = list.filter((x) => isBank(x.mode || BANK)).length;
+  return '<span class="muted" style="margin-left:auto">' + bank + ' en banque · ' + (list.length - bank) + ' en liquidité</span>';
+}
+function bulkBar(kind, visible) {
+  const sel = selSet(kind); const n = sel.size;
+  return '<div class="toolbar no-print" style="background:' + (n ? 'var(--orange-050)' : '#FAFBFC') + '">' +
+    '<button class="btn btn-sm" data-act="selAll" data-id="' + kind + ':' + visible.join(',') + '">Tout cocher (' + visible.length + ')</button>' +
+    '<button class="btn btn-sm" data-act="selNone" data-id="' + kind + '"' + (n ? '' : ' disabled') + '>Tout décocher</button>' +
+    '<span class="muted">' + (n ? '<b style="color:var(--ink)">' + n + ' sélectionnée(s)</b> — changer le mode :' : 'Cochez des lignes pour changer leur mode de paiement en une fois.') + '</span>' +
+    (n ? '<button class="btn btn-sm btn-primary" data-act="selMode" data-id="' + kind + ':' + BANK + '">Banque CAP-AIDER</button>' +
+      '<button class="btn btn-sm btn-accent" data-act="selMode" data-id="' + kind + ':' + CASH + '">Liquidité</button>' : '') + '</div>';
+}
+ACTIONS.selToggle = (key, el) => {
+  const [kind, i] = key.split(':'); const s = selSet(kind);
+  if (el.checked) s.add(+i); else s.delete(+i);
+  render();
+};
+ACTIONS.selAll = (key) => { const [kind, ids] = key.split(':'); const s = selSet(kind); (ids ? ids.split(',') : []).forEach((i) => s.add(+i)); render(); };
+ACTIONS.selNone = (kind) => { selSet(kind).clear(); render(); };
+ACTIONS.selMode = (key) => {
+  const kind = key.slice(0, key.indexOf(':')); const mode = key.slice(key.indexOf(':') + 1);
+  const s = selSet(kind); const arr = selArray(kind);
+  const items = [...s].map((i) => arr[i]).filter(Boolean);
+  const total = sum(items, (x) => kind === 'cot' ? num(x.verte) + num(x.rouge) : x.montant);
+  confirmBox('Changer le mode de paiement', items.length + ' ' + (kind === 'cot' ? 'cotisation(s)' : 'amende(s)') + ' pour <b class="num">' + money(total) + '</b> passeront en <b>' + esc(mode) + '</b>.<br><span class="muted">Le journal, la caisse et la banque seront recalculés.</span>', () => {
+    items.forEach((x) => { x.mode = mode; });
+    s.clear(); saveDB(); toast(items.length + ' ligne(s) passée(s) en ' + mode + '.', 'ok'); render();
+  });
+};
+function amendesPanel() {
+  const sel = selSet('am');
+  const list = DB.amendes_paid.map((a, i) => Object.assign({ i }, a)).sort((a, b) => parseD(b.date) - parseD(a.date));
+  const motif = (v) => (AMENDE_TYPES.find((x) => x.v === v) || { l: '—' }).l;
+  const rows = list.map((a) => '<tr' + (sel.has(a.i) ? ' class="row-sel"' : '') + '>' + (canEdit() ? '<td class="c"><input type="checkbox" aria-label="Sélectionner" data-change="selToggle" data-id="am:' + a.i + '"' + (sel.has(a.i) ? ' checked' : '') + '></td>' : '') +
+    '<td class="num">' + esc(a.date) + '</td><td><span class="code">' + a.code + '</span> ' + esc(nameOf(a.code)) + '</td><td>' + esc(motif(a.motif)) + '</td>' +
+    '<td class="n">' + fmt(a.montant) + '</td><td>' + esc(a.mode || BANK) + (a.mode ? '' : ' <span class="muted">(par défaut)</span>') + '</td><td class="act">' +
+    (canEdit() ? '<button class="btn btn-sm" data-act="amendeEdit" data-id="' + a.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="amendeDel" data-id="' + a.i + '">' + t('del') + '</button>' : '') + '</td></tr>');
+  return '<section class="panel"><div class="panel-head"><h2>Amendes encaissées</h2><span class="meta">' + list.length + ' · ' + money(sum(list, (a) => a.montant)) + '</span>' + modeSummary(list) + '</div>' +
+    (canEdit() ? bulkBar('am', list.map((a) => a.i)) : '') +
+    table((canEdit() ? [['', 'c']] : []).concat(['Date', 'Membre', 'Motif', ['Montant', 'n'], 'Mode', '']), rows,
+      '<tr>' + (canEdit() ? '<td></td>' : '') + '<td colspan="3">Total</td><td class="n">' + fmt(sum(list, (a) => a.montant)) + '</td><td colspan="2"></td></tr>') + '</section>';
+}
+ACTIONS.amendeEdit = (i) => {
+  const a = DB.amendes_paid[+i];
+  openModal({
+    title: 'Modifier l’amende', submit: t('save'),
+    body: '<div class="form-grid">' + field(t('member'), select('code', memberOptions(), a.code), 'full') +
+      field('Motif', select('motif', AMENDE_TYPES.map((x) => ({ v: x.v, l: x.l })), a.motif || 'autre')) + field(t('date'), input('date', toISO(a.date), 'type="date"')) +
+      field(t('amount') + ' (HTG)', input('montant', a.montant, 'type="number" min="0" step="any"')) + field('Mode', select('mode', [BANK, CASH], a.mode || BANK)) + '</div>',
+    onSubmit: (d) => {
+      if (num(d.montant) <= 0) { toast('Montant invalide.', 'err'); return false; }
+      Object.assign(a, { code: d.code, motif: d.motif, date: fmtD(d.date), montant: num(d.montant), mode: d.mode });
+      saveDB(); toast('Amende modifiée.', 'ok'); render();
+    },
   });
 };

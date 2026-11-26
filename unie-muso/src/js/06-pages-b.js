@@ -29,11 +29,11 @@ function scheduleTable(p, editable) {
     if (pay) st = '<span class="badge b-green">✓ Payé le ' + esc(String(pay.date).slice(0, 5)) + '</span>';
     else if (r.late) st = '<span class="badge b-red">En retard</span>';
     else st = '<span class="badge b-grey">À venir</span>';
-    const act = editable ? (pay ? '<button class="btn btn-sm btn-danger" data-act="payUndo" data-id="' + p.id + ':' + r.n + '">' + t('cancel') + '</button>'
+    const act = editable ? (pay ? '<button class="btn btn-sm" data-act="payNew" data-id="' + p.id + ':' + r.n + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="payUndo" data-id="' + p.id + ':' + r.n + '">' + t('cancel') + '</button>'
       : '<button class="btn btn-sm btn-primary" data-act="payNew" data-id="' + p.id + ':' + r.n + '">Enregistrer paiement</button>') : '';
     return '<tr class="' + (pay ? 'row-paid' : r.late ? 'row-late' : '') + '"><td class="c num">' + r.n + '</td><td class="num">' + fmtD(r.due) + (r.grace ? ' <span class="badge b-navy">grâce</span>' : '') + '</td>' +
       '<td class="n">' + fmt(r.cap) + '</td><td class="n">' + fmt(r.int) + '</td><td class="n">' + (pay ? fmt(pay.pen) : r.pen ? '<span style="color:var(--red)">' + fmt(r.pen) + '</span>' : '0') + '</td>' +
-      '<td class="n"><b>' + fmt(pay ? pay.montant : r.du) + '</b></td><td>' + st + (pay && pay.commentaire ? '<div class="muted" style="font-size:11px">' + esc(pay.commentaire) + '</div>' : '') + '</td>' +
+      '<td class="n"><b>' + fmt(pay ? pay.montant : r.du) + '</b></td><td>' + st + (pay ? ' <span class="muted" style="font-size:11px">' + esc(pay.mode || BANK) + '</span>' : '') + (pay && pay.commentaire ? '<div class="muted" style="font-size:11px">' + esc(pay.commentaire) + '</div>' : '') + '</td>' +
       (editable ? '<td class="act">' + act + '</td>' : '') + '</tr>';
   });
   return table(['N°', 'Échéance', ['Capital', 'n'], ['Intérêts', 'n'], ['Pénalité', 'n'], ['Mensualité', 'n'], 'Statut'].concat(editable ? [''] : []), rows,
@@ -42,8 +42,8 @@ function scheduleTable(p, editable) {
 function loanSheet(id) {
   const p = DB.prets.find((x) => +x.id === id); if (!p) return '<div class="empty">Prêt introuvable.</div>';
   const lt = loanTotals(p);
-  return pageHead('Prêts', 'Prêt #' + p.id + ' — ' + nameOf(p.code_membre), 'Octroyé le ' + esc(p.date) + ' · ' + money(p.capital) + ' sur ' + p.duree + ' mois' + (p.grace ? ' + 1 mois de grâce' : '') + ' · ' + p.taux + ' % dégressif',
-    '<button class="btn" data-go="prets">← Liste</button>' + (isAdmin() ? '<button class="btn btn-danger" data-act="loanDel" data-id="' + p.id + '">' + t('del') + '</button>' : '') + '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
+  return pageHead('Prêts', 'Prêt #' + p.id + ' — ' + nameOf(p.code_membre), 'Octroyé le ' + esc(p.date) + ' · ' + money(p.capital) + ' sur ' + p.duree + ' mois' + (p.grace ? ' dont 1 mois de grâce' : '') + ' · ' + p.taux + ' % dégressif · remis par ' + esc(p.mode || BANK),
+    '<button class="btn" data-go="prets">← Liste</button>' + (canEdit() ? '<button class="btn" data-act="loanEdit" data-id="' + p.id + '">' + t('edit') + '</button>' : '') + (isAdmin() ? '<button class="btn btn-danger" data-act="loanDel" data-id="' + p.id + '">' + t('del') + '</button>' : '') + '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
     '<div class="kpis">' + kpi('Déjà remboursé', fmt(lt.rembourse) + ' <small>HTG</small>', 'capital ' + fmt(lt.capRemb) + ' · intérêts ' + fmt(lt.intRemb), 'green') +
       kpi('Reste à rembourser', fmt(lt.reste) + ' <small>HTG</small>', 'capital restant ' + fmt(lt.resteCap), 'orange') +
       kpi('Mensualités payées', lt.nbPaid + ' <small>/ ' + lt.nb + '</small>', lt.retard ? lt.retard + ' en retard' : 'aucun retard', lt.retard ? 'red' : 'navy') +
@@ -53,12 +53,15 @@ function loanSheet(id) {
 ACTIONS.payNew = (key) => {
   const [id, n] = key.split(':').map(Number);
   const p = DB.prets.find((x) => +x.id === id); const r = loanSchedule(p).find((x) => x.n === n);
+  const old = r.payment;
+  const v = old ? { date: old.date, mode: old.mode || BANK, cap: old.cap, int: old.int, pen: old.pen, du: old.montant, com: old.commentaire || '' }
+    : { date: today(), mode: BANK, cap: r.cap, int: r.int, pen: r.pen, du: r.du, com: '' };
   openModal({
-    title: 'Paiement — mensualité n° ' + n, submit: t('save'),
-    body: '<div class="form-grid">' + field(t('date'), input('date', toISO(today()), 'type="date" required')) + field('Mode', select('mode', [BANK, CASH], BANK)) +
-      field('Capital', input('cap', r.cap, 'type="number" step="any" min="0" data-sum')) + field('Intérêts', input('int', r.int, 'type="number" step="any" min="0" data-sum')) +
-      field('Pénalité', input('pen', r.pen, 'type="number" step="any" min="0" data-sum'), '', r.late ? r.monthsLate + ' mois de retard × ' + RULES.penalite_pret_pct + ' % du capital' : '') +
-      field('Montant total', input('montant', r.du, 'type="number" step="any" readonly')) + field('Commentaire', input('commentaire', ''), 'full') + '</div>',
+    title: (old ? 'Modifier le paiement' : 'Paiement') + ' — mensualité n° ' + n, submit: t('save'),
+    body: '<div class="form-grid">' + field(t('date'), input('date', toISO(v.date), 'type="date" required')) + field('Mode', select('mode', [BANK, CASH], v.mode)) +
+      field('Capital', input('cap', v.cap, 'type="number" step="any" min="0" data-sum')) + field('Intérêts', input('int', v.int, 'type="number" step="any" min="0" data-sum')) +
+      field('Pénalité', input('pen', v.pen, 'type="number" step="any" min="0" data-sum'), '', !old && r.late ? r.monthsLate + ' mois de retard × ' + RULES.penalite_pret_pct + ' % du capital' : '') +
+      field('Montant total', input('montant', v.du, 'type="number" step="any" readonly')) + field('Commentaire', input('commentaire', v.com), 'full') + '</div>',
     onOpen: (el) => el.querySelectorAll('[data-sum]').forEach((i) => i.addEventListener('input', () => {
       const f = el.querySelector('form'); f.montant.value = round2(num(f.cap.value) + num(f.int.value) + num(f.pen.value));
     })),
@@ -86,6 +89,7 @@ function loanFormBody(code, montant, duree, grace) {
     field('Capital (HTG)', input('capital', montant || '', 'type="number" min="1" step="any" required data-prev')) +
     field('Durée (mois)', input('duree', duree || 8, 'type="number" min="1" max="24" data-prev'), '', 'Règlement interne : 24 mois maximum.') +
     field('Taux mensuel (%)', input('taux', 1.5, 'type="number" step="0.01" min="0" data-prev')) +
+    field('Prêt remis par', select('mode', [BANK, CASH], BANK), '', 'Sortie de la banque CAP-AIDER ou de la caisse (liquidité).') +
     field('Mois de grâce', '<label class="check"><input type="checkbox" name="grace" data-prev' + (grace ? ' checked' : '') + '> Premier mois : intérêts seulement</label>', 'full') +
     '<div class="full" id="loan-prev"></div></div>';
 }
@@ -97,7 +101,7 @@ function bindLoanPreview(el) {
     const lt = loanTotals(p);
     const sc = creditScore(f.code.value);
     el.querySelector('#loan-prev').innerHTML = '<div class="banner soft" style="margin:0"><span>Intérêts : <b class="num">' + money(lt.interets) + '</b> · total à rembourser <b class="num">' + money(p.capital + lt.interets) + '</b> · 1re mensualité <b class="num">' + money(lt.rows[0].total) + '</b></span></div>' +
-      '<div class="muted" style="margin-top:6px">Grille : score ' + sc.score + '/100 · ' + esc(sc.seuil.label) + ' · max indicatif ' + money(sc.max) + (sc.hasLoan ? ' · <b style="color:var(--red)">prêt déjà en cours</b>' : '') + '</div>';
+      '<div class="muted" style="margin-top:6px">Grille automatique : ' + fmt(sc.auto) + '/' + sc.autoMax + ' · au mieux (comité 20/20) : ' + esc(sc.bestSeuil.label) + ', ' + money(sc.bestMax) + (sc.hasLoan ? ' · <b style="color:var(--red)">prêt déjà en cours</b>' : '') + '</div>';
   };
   f.querySelectorAll('[data-prev], [name=code], [name=date]').forEach((i) => { i.addEventListener('input', upd); i.addEventListener('change', upd); });
   upd();
@@ -107,10 +111,33 @@ ACTIONS.loanNew = () => openModal({
   onSubmit: (d) => {
     if (num(d.capital) <= 0) { toast('Capital invalide.', 'err'); return false; }
     if (num(d.duree) > 24) { toast('Durée maximale : 24 mois (règlement interne).', 'err'); return false; }
-    const p = { id: nextLoanId(), code_membre: d.code, nom_membre: nameOf(d.code), date: fmtD(d.date), capital: num(d.capital), duree: num(d.duree), taux: num(d.taux), grace: d.grace, total_interets: 0, status: 'en cours', payments: [] };
+    const p = { id: nextLoanId(), code_membre: d.code, nom_membre: nameOf(d.code), date: fmtD(d.date), capital: num(d.capital), duree: num(d.duree), taux: num(d.taux), grace: d.grace, mode: d.mode, total_interets: 0, status: 'en cours', payments: [] };
     refreshLoanStatus(p); DB.prets.push(p); saveDB(); toast('Prêt #' + p.id + ' créé.', 'ok'); go('prets', p.id);
   },
 });
+
+/* Modifier un prêt : date et mode de remise toujours ; montant, durée, taux et grâce seulement sans paiement */
+ACTIONS.loanEdit = (id) => {
+  const p = DB.prets.find((x) => +x.id === +id); const locked = (p.payments || []).length > 0;
+  const ro = locked ? ' readonly' : '';
+  openModal({
+    title: 'Modifier le prêt #' + p.id, submit: t('save'),
+    body: (locked ? '<div class="banner soft">Ce prêt a déjà des remboursements : seuls la date et le mode de remise sont modifiables.</div>' : '') +
+      '<div class="form-grid">' + field('Date d’octroi', input('date', toISO(p.date), 'type="date"')) +
+      field('Prêt remis par', select('mode', [BANK, CASH], p.mode || BANK)) +
+      field('Capital (HTG)', input('capital', p.capital, 'type="number" min="1" step="any"' + ro)) + field('Durée (mois)', input('duree', p.duree, 'type="number" min="1" max="24"' + ro)) +
+      field('Taux mensuel (%)', input('taux', p.taux, 'type="number" step="0.01" min="0"' + ro)) +
+      field('Mois de grâce', '<label class="check"><input type="checkbox" name="grace"' + (p.grace ? ' checked' : '') + (locked ? ' disabled' : '') + '> Premier mois : intérêts seulement</label>') + '</div>',
+    onSubmit: (d) => {
+      p.date = fmtD(d.date) || p.date; p.mode = d.mode;
+      if (!locked) {
+        if (num(d.capital) <= 0 || num(d.duree) < 1 || num(d.duree) > 24) { toast('Capital ou durée invalide.', 'err'); return false; }
+        p.capital = num(d.capital); p.duree = num(d.duree); p.taux = num(d.taux); p.grace = d.grace;
+      }
+      refreshLoanStatus(p); saveDB(); toast('Prêt modifié.', 'ok'); render();
+    },
+  });
+};
 
 /* Demandes de prêt et grille : voir 06b-credit.js */
 

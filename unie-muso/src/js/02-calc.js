@@ -252,7 +252,7 @@ function buildJournal() {
     [{ acc: depAccount(d.categorie), d: d.montant }, { acc: cashAcc(d.mode || BANK), c: d.montant }], 'dep'));
   DB.prets.forEach((p) => {
     add(p.date, 'PRET-' + p.id, 'Décaissement prêt ' + p.code_membre + ' — ' + nameOf(p.code_membre),
-      [{ acc: 1210, d: p.capital }, { acc: 1020, c: p.capital }], 'pret');
+      [{ acc: 1210, d: p.capital }, { acc: cashAcc(p.mode || BANK), c: p.capital }], 'pret');
     (p.payments || []).forEach((x) => add(x.date, 'RMB-' + p.id + '-' + x.n, 'Remboursement prêt #' + p.id + ' éch. ' + x.n + ' — ' + p.code_membre, [
       { acc: cashAcc(x.mode), d: x.montant }, { acc: 1210, c: x.cap }, { acc: 4040, c: x.int }, { acc: 4050, c: x.pen }], 'rmb'));
   });
@@ -341,7 +341,7 @@ function nextDemandeId() { return DB.demandes_pret.reduce((mx, d) => Math.max(mx
 function createLoanFromDemande(d) {
   const p = {
     id: nextLoanId(), code_membre: d.code_membre, nom_membre: nameOf(d.code_membre), date: d.date_decision || fmtD(today()),
-    capital: num(d.montant_approuve), duree: num(d.duree_approuvee) || 8, taux: 1.5, grace: !!d.grace_approuve,
+    capital: num(d.montant_approuve), duree: num(d.duree_approuvee) || 8, taux: 1.5, grace: !!d.grace_approuve, mode: d.mode_remise || BANK,
     total_interets: 0, status: 'en cours', payments: [],
   };
   refreshLoanStatus(p);
