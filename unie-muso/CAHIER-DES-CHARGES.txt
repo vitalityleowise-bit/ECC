@@ -1,0 +1,47 @@
+UNIE-MUSO — Demandes à réaliser (notées le 26/11/2026)
+====================================================
+
+Statut : EN ATTENTE. Le trésorier relit l'application et enverra d'autres corrections
+avant le début de ces travaux. Ne contient aucune donnée personnelle de membre.
+
+A. VERSION EN LIGNE AVEC SYNCHRONISATION AUTOMATIQUE (choisie)
+   - Données sur un serveur sécurisé (Firebase ou Supabase, formule gratuite).
+   - L'application continue de fonctionner hors ligne ; dès qu'Internet revient,
+     tout se synchronise automatiquement (téléphone Android, PC, iPhone).
+   - Vrais comptes sécurisés (admin, caissier, membres, comité) et règles d'accès
+     côté serveur (un membre ne voit que ses données + le rapport mensuel).
+   - Le trésorier crée lui-même le compte du service, avec un guide pas à pas.
+
+B. MESSAGERIE INTERNE + NOTIFICATIONS
+   1. Remercier un membre pour sa cotisation (après l'enregistrement).
+   2. Indiquer à un membre le montant à verser à la prochaine réunion
+      (cotisation du mois, retard, amendes, mensualité de prêt).
+   3. Rappeler l'heure et la date de la réunion.
+   4. Rappeler à un membre qu'il n'a pas payé ses dernières cotisations.
+   5. Après une demande de prêt : message automatique « votre demande est reçue,
+      le comité va l'étudier ».
+   6. Souhaiter l'anniversaire d'un membre avec un beau message (date de naissance
+      de la fiche membre).
+   7. Messages envoyés à un membre, à plusieurs membres ou à tous.
+
+C. RÉUNIONS PROGRAMMÉES
+   1. Pouvoir programmer une réunion à une autre date que le dernier jeudi du mois
+      (date, heure, lieu, ordre du jour).
+   2. Réunions du comité : c'est la PRÉSIDENTE qui les programme depuis son compte
+      (date, heure, lieu, objet).
+   3. Chaque personne convoquée reçoit une notification et CONFIRME sa participation
+      (présent / absent / excusé).
+   4. Relances automatiques, plusieurs fois, tant que la personne n'a pas répondu.
+   5. La présidente voit qui a confirmé, qui a refusé, qui n'a pas répondu.
+
+D. iPHONE
+   - Pas d'APK possible sur iPhone. Solution : la version en ligne (A), ouverte dans
+     Safari puis « Ajouter à l'écran d'accueil » (icône comme une application).
+   - Notifications sur iPhone : iOS 16.4 ou plus récent, application ajoutée à
+     l'écran d'accueil.
+
+E. À NOTER
+   - Les messages entre téléphones et les relances automatiques ont besoin du
+     serveur de la version en ligne (A) : ils seront faits ensemble.
+   - En complément possible : bouton « Envoyer par WhatsApp » qui prépare le message
+     (remerciement, rappel, montant dû) pour le membre concerné.
