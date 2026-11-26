@@ -1,0 +1,64 @@
+{
+  "name": "unie-muso",
+  "productName": "UNIE-MUSO",
+  "version": "3.0.0",
+  "description": "Gestion de la mutuelle de solidarité UNIE-MUSO (Petit-Goâve)",
+  "author": "UNIE-MUSO",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable --x64"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "build": {
+    "appId": "ht.uniemuso.app",
+    "productName": "UNIE-MUSO",
+    "copyright": "UNIE-MUSO — Petit-Goâve",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.ico",
+      "app/**"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "unimiso",
+        "name": "Sauvegarde UNIE-MUSO",
+        "description": "Sauvegarde UNIE-MUSO",
+        "icon": "icon.ico",
+        "role": "Editor"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "UNIE-MUSO",
+      "artifactName": "UNIE-MUSO-Installation-${version}.exe",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "language": "1036"
+    },
+    "portable": {
+      "artifactName": "UNIE-MUSO-Portable-${version}.exe"
+    }
+  }
+}

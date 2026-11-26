@@ -1,0 +1,43 @@
+UNIE-MUSO — Application Windows
+================================
+
+DEUX FAÇONS D'UTILISER UNIE-MUSO SUR PC
+---------------------------------------
+
+1) PROGRAMME COMPLET (recommandé) : UNIE-MUSO-Windows.zip
+   - Clic droit sur le ZIP > « Extraire tout », puis double-cliquez
+     sur INSTALLER.bat. Aucun droit administrateur n'est nécessaire.
+   - Un raccourci UNIE-MUSO est créé sur le Bureau et dans le menu Démarrer.
+   - Les données sont enregistrées automatiquement dans :
+         Documents\UNIE-MUSO\donnees-uniemuso.unimiso
+     avec une copie chaque jour dans Documents\UNIE-MUSO\sauvegardes\
+   - Double-cliquer sur un fichier .unimiso (reçu par WhatsApp Desktop,
+     e-mail, clé USB) ouvre UNIE-MUSO et importe les données.
+   - Quand vous fermez la fenêtre, UNIE-MUSO reste près de l'horloge
+     (icône UNIE-MUSO) pour envoyer les rappels de réunion.
+     Clic droit sur l'icône > Quitter pour l'arrêter.
+   - Pour désinstaller : Paramètres Windows > Applications > UNIE-MUSO,
+     ou DESINSTALLER.bat. Vos données dans Documents\UNIE-MUSO restent.
+
+   Si Windows affiche « Windows a protégé votre ordinateur » :
+     cliquez « Informations complémentaires » puis « Exécuter quand même ».
+   Si Windows 11 bloque complètement le programme (Smart App Control),
+   utilisez la solution 2 ci-dessous.
+
+2) SANS INSTALLATION : UNIE-MUSO-PC.zip
+   - Gardez UNIE-MUSO.html et UNIE-MUSO.bat dans le même dossier.
+   - Double-cliquez sur UNIE-MUSO.bat : l'application s'ouvre dans une
+     fenêtre Edge ou Chrome sans barre d'adresse.
+   - Les données restent dans %LocalAppData%\UNIE-MUSO.
+   - Pensez à faire « Sauvegarde > Exporter en JSON » régulièrement.
+
+PREMIÈRE CONNEXION
+------------------
+   Identifiant : admin        Mot de passe : admin
+   Changez ce mot de passe dans Paramètres > Comptes de gestion.
+   Les membres se connectent avec leur code (ex. M004) et leur mot de passe.
+
+IMPORTER VOS DONNÉES
+--------------------
+   Sauvegarde > Importer un fichier, puis choisissez votre fichier
+   .json ou .unimiso.

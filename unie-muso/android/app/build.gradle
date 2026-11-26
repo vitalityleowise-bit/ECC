@@ -1,0 +1,27 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'ht.uniemuso.app'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'ht.uniemuso.app'
+        minSdk 24
+        targetSdk 34
+        versionCode 3
+        versionName '3.0.0'
+    }
+    signingConfigs {
+        release {
+            storeFile file(System.getenv('UNIE_KEYSTORE') ?: 'uniemuso.keystore')
+            storePassword System.getenv('UNIE_KEYSTORE_PASS') ?: ''
+            keyAlias 'uniemuso'
+            keyPassword System.getenv('UNIE_KEYSTORE_PASS') ?: ''
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}
