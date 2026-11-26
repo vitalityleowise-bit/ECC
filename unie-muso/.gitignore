@@ -2,3 +2,5 @@ release/
 electron/node_modules/
 electron/release/
 electron/app/
+src/private/
+dist/

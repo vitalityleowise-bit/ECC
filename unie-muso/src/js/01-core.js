@@ -22,32 +22,13 @@ function seedMember(code, nom, prenom, extra) {
     comite_see_reports: true, date_naissance: '', profession: '',
   }, extra || {});
 }
-function seedLoan(id, code, nom) {
-  return { id, code_membre: code, nom_membre: nom, date: '29/10/2026', capital: 40000, duree: 8, taux: 1.5,
-    grace: false, total_interets: 2700, status: 'en cours', payments: [] };
-}
-const SEED_DATA = {
-  members: [
-    seedMember('M001', 'LEBRUN', 'DJOURA K.V.', { date_adhesion: '26/03/2026' }),
-    seedMember('M002', '', ''), seedMember('M003', '', ''),
-    seedMember('M004', 'VALLON', 'Rose Abigail', { is_comite: true, comite_poste: 'Présidente' }),
-    seedMember('M005', 'FLEURIME', 'RONALDO'),
-    seedMember('M006', '', ''), seedMember('M007', '', ''), seedMember('M008', '', ''),
-    seedMember('M009', '', ''), seedMember('M010', '', ''),
-    seedMember('M011', 'PATRICE MICHELET', 'R.L', { is_comite: true, comite_poste: 'Trésorier' }),
-    seedMember('M012', '', ''), seedMember('M013', '', ''),
-    seedMember('M014', 'HILAIRE', '', { statut: 'Inactif' }),
-    seedMember('M015', '', ''), seedMember('M016', '', ''), seedMember('M017', '', ''), seedMember('M018', '', ''),
-    seedMember('M019', 'CIVIL', 'DIONE', { date_adhesion: '29/10/2026' }),
-  ],
-  cotisations: [],
-  amendes_paid: [],
-  depenses: [],
-  prets: [seedLoan(1, 'M005', 'FLEURIME RONALDO'), seedLoan(2, 'M009', ''), seedLoan(3, 'M011', 'PATRICE MICHELET R.L')],
-  absences: [],
-  demandes_pret: [],
-  transferts: [],
+/* Données de départ. Les vraies données des membres (noms, cotisations, amendes, prêts) ne sont PAS dans
+   le code source public : build.js les injecte depuis src/private/seed.json (exclu de Git) sous PRIVATE_SEED. */
+const GENERIC_SEED = {
+  members: Array.from({ length: 19 }, (_, i) => seedMember('M' + String(i + 1).padStart(3, '0'), '', '')),
+  cotisations: [], amendes_paid: [], depenses: [], prets: [], absences: [], demandes_pret: [], transferts: [],
 };
+const SEED_DATA = (typeof PRIVATE_SEED !== 'undefined' && PRIVATE_SEED) ? PRIVATE_SEED : GENERIC_SEED;
 const DEFAULT_USERS = {
   admin: { pwd: 'admin', role: 'admin', fullname: 'PATRICE MICHELET R. LEONARDO', position: 'Trésorier' },
   caissier: { pwd: 'caissier', role: 'caissier', fullname: 'Caissier', position: 'Caissier' },

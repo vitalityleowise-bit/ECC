@@ -74,18 +74,26 @@ function memberStats(code, asOf) {
 }
 
 /* ---------- Prêts ---------- */
+/* Échéancier : intérêts 1,5 % dégressifs calculés sur le tableau d'amortissement standard
+   (40 000 / 8 mois → 600, 525, 450 … 75 = 2 700 HTG).
+   Mois de grâce (règle de l'ancienne application, appliquée aux prêts en cours) : la durée reste la même,
+   le 1er mois ne paie que l'intérêt, et le capital est réparti sur les mois restants ; les intérêts ne changent pas. */
 function loanSchedule(p) {
   const rows = []; const n = Math.max(1, num(p.duree)); const t = num(p.taux) / 100; const cap = num(p.capital);
   const start = parseD(p.date) || today();
-  let rest = cap; let k = 0;
   const due = (i) => lastThursday(start.getFullYear(), start.getMonth() + i);
-  if (p.grace) { k++; rows.push({ n: k, due: due(k), cap: 0, int: round2(rest * t), grace: true }); }
-  const mc = Math.round(cap / n);
+  const grace = !!p.grace && n > 1;
+  const nbCap = grace ? n - 1 : n;
+  const mc = round2(cap / nbCap);
+  let rest = cap;
   for (let i = 0; i < n; i++) {
-    k++;
-    const c = i === n - 1 ? rest : mc;
-    rows.push({ n: k, due: due(k), cap: c, int: round2(rest * t) });
-    rest -= c;
+    const int = round2(cap * (1 - i / n) * t);
+    let c;
+    if (grace && i === 0) c = 0;
+    else if (i === n - 1) c = round2(rest);
+    else c = mc;
+    rows.push({ n: i + 1, due: due(i + 1), cap: c, int, grace: grace && i === 0 });
+    rest = round2(rest - c);
   }
   const pct = num(RULES.penalite_pret_pct) / 100;
   const t0 = today();
@@ -142,6 +150,8 @@ function cotMonthsStatus(code, asOf) {
   const start = parseD(RULES.mutuelle_start); const adh = parseD(m.date_adhesion);
   const adhMonth = adh ? new Date(adh.getFullYear(), adh.getMonth(), 1) : null;
   const cots = DB.cotisations.filter((c) => c.code === code);
+  // Seuls les mois où une réunion s'est réellement tenue comptent (ex. : pas de réunion en juillet 2026)
+  const held = new Set(meetingDates().map((d) => monthKey(d)));
   const out = []; let idx = 0;
   for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= t0; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
     const meet = lastThursday(d.getFullYear(), d.getMonth());
@@ -149,6 +159,7 @@ function cotMonthsStatus(code, asOf) {
     // Le mois n'est « en retard » qu'une fois la réunion passée (le jour même, on peut encore payer)
     if (meet >= t0) break;
     if (adhMonth && meet < adhMonth) continue;
+    if (!held.has(monthKey(meet))) continue;
     const paid = sum(cots.filter((c) => parseD(c.date) <= meet), (c) => num(c.verte) + num(c.rouge));
     out.push({ key: monthKey(d), meet, idx, paid, late: paid + 0.01 < idx * COT() });
   }

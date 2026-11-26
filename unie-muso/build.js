@@ -13,7 +13,13 @@ const jsFiles = fs.readdirSync(path.join(src, 'js')).filter((f) => f.endsWith('.
 const logoPath = path.join(root, 'assets', 'logo.jpg');
 const logo = fs.existsSync(logoPath) ? 'data:image/jpeg;base64,' + fs.readFileSync(logoPath).toString('base64') : '';
 
-const js = ['/* UNIE-MUSO — application autonome hors ligne */', 'const EMBEDDED_LOGO = ' + JSON.stringify(logo) + ';']
+// Données réelles des membres : fichier privé, jamais versionné (voir .gitignore)
+const seedPath = path.join(src, 'private', 'seed.json');
+const privateSeed = fs.existsSync(seedPath) ? JSON.parse(fs.readFileSync(seedPath, 'utf8')) : null;
+if (!privateSeed) console.warn('Attention : src/private/seed.json absent — build sans données de membres.');
+
+const js = ['/* UNIE-MUSO — application autonome hors ligne */', 'const EMBEDDED_LOGO = ' + JSON.stringify(logo) + ';',
+  'const PRIVATE_SEED = ' + JSON.stringify(privateSeed) + ';']
   .concat(jsFiles.map((f) => '/* ---- ' + f + ' ---- */\n' + fs.readFileSync(path.join(src, 'js', f), 'utf8')))
   .join('\n');
 // Le JS est enveloppé pour isoler la portée tout en gardant les fonctions globales utilisées par les attributs onclick
