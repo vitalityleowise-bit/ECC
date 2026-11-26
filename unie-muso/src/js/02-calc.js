@@ -210,12 +210,14 @@ function evaluateDemande(d) {
   const pres = ev.presence !== undefined && ev.presence !== null && ev.presence !== '' ? num(ev.presence) : sc.pres.pts;
   const cot = ev.cotisation !== undefined && ev.cotisation !== null && ev.cotisation !== '' ? num(ev.cotisation) : sc.cot.pts;
   const cred = Array.isArray(ev.credits) && ev.credits.length ? sum(ev.credits) : sc.cred.pts;
-  const notes = Object.keys(ev.notes_comite || {}).map((k) => ({ code: k, note: ev.notes_comite[k] })).filter((n) => n.note !== '' && n.note !== null && n.note !== undefined);
+  // Le demandeur ne note jamais sa propre demande, même s'il est membre du comité
+  const graders = comiteMembers().filter((m) => m.code !== d.code_membre).map((m) => m.code);
+  const notes = Object.keys(ev.notes_comite || {}).filter((k) => k !== d.code_membre).map((k) => ({ code: k, note: ev.notes_comite[k] })).filter((n) => n.note !== '' && n.note !== null && n.note !== undefined);
   const appreciation = notes.length ? round2(sum(notes, (n) => n.note) / notes.length) : null;
   const total = round2(pres + cot + cred + (appreciation || 0));
   const seuil = appreciation === null ? null : seuilFor(total);
   const montant = seuil ? Math.round(sc.base * num(seuil.mult)) : null;
-  return { sc, pres, cot, cred, notes, appreciation, total, seuil, montant, complete: appreciation !== null, nbComite: comiteMembers().length };
+  return { sc, pres, cot, cred, notes, appreciation, total, seuil, montant, complete: appreciation !== null, nbComite: graders.length, graders };
 }
 
 /* ---------- Comptabilité : plan comptable et journal ---------- */

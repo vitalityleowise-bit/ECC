@@ -126,7 +126,7 @@ PAGES.membres = function () {
   return pageHead('Gestion', t('membres'), DB.members.length + ' membres · triés par code',
     canEdit() ? '<button class="btn btn-primary" data-act="newMember">Nouveau membre</button>' : '') +
     '<section class="panel"><div class="toolbar"><input type="search" placeholder="Rechercher un membre…" value="' + esc(STATE.q || '') + '" data-change="searchMember" style="min-width:220px"></div>' +
-    table(['Code', 'Nom', 'Téléphone', 'Adhésion', ['Versé', 'n'], 'Cotisation', 'Comité', 'Statut'], rows) + '</section>';
+    table(['Code', 'Nom', 'Téléphone', 'Adhésion', ['Versé', 'n'], 'Cotisation', 'Comité', 'Statut'], rows) + '</section>' + attendanceRegister();
 };
 ACTIONS.searchMember = (_id, el) => { STATE.q = el.value; render(); };
 ACTIONS.openMember = (code) => { STATE.page = 'membres'; STATE.param = code; render(); window.scrollTo(0, 0); };
@@ -292,9 +292,18 @@ ACTIONS.amendeNew = (code) => openModal({
   },
 });
 /* Feuille de présence d'une réunion : présent / retard / représenté / absent */
-ACTIONS.attendanceSheet = () => {
-  const d = lastThursdayOf(today()) <= today() ? lastThursdayOf(today()) : lastThursday(today().getFullYear(), today().getMonth() - 1);
-  const bodyFor = (date) => '<div class="field" style="max-width:220px;margin-bottom:12px"><label>Date de la réunion</label><input type="date" name="date" value="' + toISO(date) + '"></div>' +
+/* Toutes les réunions possibles (dernier jeudi de chaque mois) depuis le démarrage, les plus récentes d'abord */
+function pastMeetingOptions() {
+  const out = []; const start = parseD(RULES.mutuelle_start); const held = new Set(meetingDates().map(fmtD));
+  for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= today(); d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    const m = lastThursday(d.getFullYear(), d.getMonth());
+    if (m <= today()) out.push({ v: toISO(m), l: longDate(m) + (held.has(fmtD(m)) ? '' : ' — aucune saisie') });
+  }
+  return out.reverse();
+}
+ACTIONS.attendanceSheet = (iso) => {
+  const d = parseD(iso) || (lastThursdayOf(today()) <= today() ? lastThursdayOf(today()) : lastThursday(today().getFullYear(), today().getMonth() - 1));
+  const bodyFor = (date) => '<div class="field" style="max-width:320px;margin-bottom:12px"><label>Réunion</label>' + select('date', pastMeetingOptions(), toISO(date)) + '</div>' +
     table(['Code', 'Membre', 'Pointage', 'Motif'], DB.members.filter((m) => m.statut !== 'Inactif').sort(sortByCode).map((m) => {
       const rec = attendanceRecord(m.code, date); const type = attendanceType(m.code, date);
       return '<tr><td class="code">' + m.code + '</td><td>' + esc(memberName(m)) + '</td><td>' + select('att_' + m.code, ATT_TYPES, type) + '</td><td>' + input('reason_' + m.code, rec ? rec.reason || '' : '', 'placeholder="facultatif"') + '</td></tr>';
@@ -386,18 +395,28 @@ ACTIONS.selMode = (key) => {
   });
 };
 function amendesPanel() {
-  const sel = selSet('am');
-  const list = DB.amendes_paid.map((a, i) => Object.assign({ i }, a)).sort((a, b) => parseD(b.date) - parseD(a.date));
+  const sel = selSet('am'); const af = STATE.afilt || {};
+  const months = [...new Set(DB.amendes_paid.map((a) => monthKey(a.date)))].sort().reverse();
+  let list = DB.amendes_paid.map((a, i) => Object.assign({ i }, a));
+  if (af.month) list = list.filter((a) => monthKey(a.date) === af.month);
+  if (af.code) list = list.filter((a) => a.code === af.code);
+  if (af.motif) list = list.filter((a) => (a.motif || 'autre') === af.motif);
+  list.sort((a, b) => parseD(b.date) - parseD(a.date));
   const motif = (v) => (AMENDE_TYPES.find((x) => x.v === v) || { l: '—' }).l;
   const rows = list.map((a) => '<tr' + (sel.has(a.i) ? ' class="row-sel"' : '') + '>' + (canEdit() ? '<td class="c"><input type="checkbox" aria-label="Sélectionner" data-change="selToggle" data-id="am:' + a.i + '"' + (sel.has(a.i) ? ' checked' : '') + '></td>' : '') +
     '<td class="num">' + esc(a.date) + '</td><td><span class="code">' + a.code + '</span> ' + esc(nameOf(a.code)) + '</td><td>' + esc(motif(a.motif)) + '</td>' +
     '<td class="n">' + fmt(a.montant) + '</td><td>' + esc(a.mode || BANK) + (a.mode ? '' : ' <span class="muted">(par défaut)</span>') + '</td><td class="act">' +
     (canEdit() ? '<button class="btn btn-sm" data-act="amendeEdit" data-id="' + a.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="amendeDel" data-id="' + a.i + '">' + t('del') + '</button>' : '') + '</td></tr>');
-  return '<section class="panel"><div class="panel-head"><h2>Amendes encaissées</h2><span class="meta">' + list.length + ' · ' + money(sum(list, (a) => a.montant)) + '</span>' + modeSummary(list) + '</div>' +
+  return '<section class="panel"><div class="panel-head"><h2>Amendes encaissées</h2><span class="meta">' + list.length + ' · ' + money(sum(list, (a) => a.montant)) + '</span></div>' +
+    '<div class="toolbar"><select data-change="amFilter" data-id="month"><option value="">Tous les mois</option>' + months.map((k) => '<option value="' + k + '"' + (af.month === k ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
+    '<select data-change="amFilter" data-id="code"><option value="">Tous les membres</option>' + memberOptions().map((o) => '<option value="' + o.v + '"' + (af.code === o.v ? ' selected' : '') + '>' + esc(o.l) + '</option>').join('') + '</select>' +
+    '<select data-change="amFilter" data-id="motif"><option value="">Tous les motifs</option>' + AMENDE_TYPES.map((x) => '<option value="' + x.v + '"' + (af.motif === x.v ? ' selected' : '') + '>' + esc(x.l) + '</option>').join('') + '</select>' +
+    modeSummary(list) + '</div>' +
     (canEdit() ? bulkBar('am', list.map((a) => a.i)) : '') +
     table((canEdit() ? [['', 'c']] : []).concat(['Date', 'Membre', 'Motif', ['Montant', 'n'], 'Mode', '']), rows,
       '<tr>' + (canEdit() ? '<td></td>' : '') + '<td colspan="3">Total</td><td class="n">' + fmt(sum(list, (a) => a.montant)) + '</td><td colspan="2"></td></tr>') + '</section>';
 }
+ACTIONS.amFilter = (key, el) => { STATE.afilt = Object.assign({}, STATE.afilt, { [key]: el.value }); selSet('am').clear(); render(); };
 ACTIONS.amendeEdit = (i) => {
   const a = DB.amendes_paid[+i];
   openModal({
@@ -412,3 +431,24 @@ ACTIONS.amendeEdit = (i) => {
     },
   });
 };
+
+/* Registre des présences : membres × réunions tenues ; un clic sur une date ouvre la feuille pour la corriger */
+function attendanceRegister() {
+  const meets = meetingDates();
+  const L = { present: ['P', 'b-green', 'Présent'], retard: ['R', 'b-orange', 'Retard'], represente: ['Rp', 'b-navy', 'Représenté'], absence: ['A', 'b-red', 'Absent'] };
+  const head = '<tr><th>Membre</th>' + meets.map((d) => '<th class="c">' + (canEdit() ? '<button class="btn btn-sm" data-act="attendanceSheet" data-id="' + toISO(d) + '" title="Corriger la feuille du ' + esc(longDate(d)) + '">' + fmtD(d).slice(0, 5) + '</button>' : fmtD(d).slice(0, 5)) + '</th>').join('') + '<th class="n">Prés.</th></tr>';
+  const rows = DB.members.filter((m) => m.statut !== 'Inactif').sort(sortByCode).map((m) => {
+    const adh = parseD(m.date_adhesion); let pres = 0, tot = 0;
+    const cells = meets.map((d) => {
+      if (adh && d < adh) return '<td class="c muted">·</td>';
+      const ty = attendanceType(m.code, d); tot++; if (ty !== 'absence') pres++;
+      const rec = attendanceRecord(m.code, d);
+      return '<td class="c"><span class="badge ' + L[ty][1] + '" title="' + L[ty][2] + (rec && rec.reason ? ' — ' + esc(rec.reason) : '') + '">' + L[ty][0] + '</span></td>';
+    }).join('');
+    return '<tr><td><span class="code">' + m.code + '</span> ' + esc(memberName(m)) + '</td>' + cells + '<td class="n num">' + pres + '/' + tot + '</td></tr>';
+  }).join('');
+  return '<section class="panel"><div class="panel-head"><h2>Registre des présences</h2><span class="meta">P présent · R retard · Rp représenté · A absent</span>' +
+    (canEdit() ? '<div class="right"><button class="btn btn-sm btn-primary" data-act="attendanceSheet">Pointer une réunion</button></div>' : '') + '</div>' +
+    (meets.length ? '<div class="tbl-wrap"><table class="tbl"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' : '<div class="empty">Aucune réunion enregistrée.</div>') +
+    '<div class="section-note">Cliquez sur une date pour corriger la feuille de présence de cette réunion. Sans pointage, un membre qui a cotisé le jour de la réunion est compté présent.</div></section>';
+}

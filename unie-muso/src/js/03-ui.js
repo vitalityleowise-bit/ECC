@@ -158,7 +158,7 @@ const PAGE_DEFS = [
   { id: 'balance', g: 'g_compta', roles: ['admin', 'comite:compta'] },
   { id: 'bilan', g: 'g_compta', roles: ['admin', 'comite:compta'] },
   { id: 'resultats', g: 'g_compta', roles: ['admin', 'comite:compta'] },
-  { id: 'rapport', g: 'g_rapports', roles: ['admin', 'comite:reports'] },
+  { id: 'rapport', g: 'g_rapports', roles: ['admin', 'caissier', 'membre', 'comite'] },
   { id: 'statuts', g: 'g_docs', roles: ['admin', 'caissier', 'docs'] },
   { id: 'reglement', g: 'g_docs', roles: ['admin', 'caissier', 'docs'] },
   { id: 'sauvegarde', g: 'g_outils', roles: ['admin', 'caissier'] },

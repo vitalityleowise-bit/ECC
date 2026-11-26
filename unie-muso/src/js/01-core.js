@@ -30,7 +30,7 @@ const GENERIC_SEED = {
 };
 const SEED_DATA = (typeof PRIVATE_SEED !== 'undefined' && PRIVATE_SEED) ? PRIVATE_SEED : GENERIC_SEED;
 const DEFAULT_USERS = {
-  admin: { pwd: 'admin', role: 'admin', fullname: 'PATRICE MICHELET R. LEONARDO', position: 'Trésorier' },
+  admin: { pwd: 'admin', role: 'admin', fullname: 'PATRICE MICHELET R. LEONARDO', position: 'Trésorier', member_code: 'M011' },
   caissier: { pwd: 'caissier', role: 'caissier', fullname: 'Caissier', position: 'Caissier' },
 };
 /* Montants des amendes : Règlement interne UNIE-MUSO (modifiables par le trésorier dans Paramètres)
@@ -125,6 +125,8 @@ function normalizeDB(d) {
 function loadAll() {
   DB = normalizeDB(store.get(KEYS.db, SEED_DATA));
   USERS = store.get(KEYS.users, DEFAULT_USERS);
+  // Anciennes sauvegardes : relie le compte admin du trésorier à sa fiche membre (conflit d'intérêts sur ses propres crédits)
+  if (USERS.admin && USERS.admin.member_code === undefined && /PATRICE/i.test(USERS.admin.fullname || '')) USERS.admin.member_code = 'M011';
   RULES = migrateRules(store.get(KEYS.rules, null));
   GRILLE = migrateGrille(store.get(KEYS.grille, DEFAULT_GRILLE));
   SETTINGS = Object.assign(clone(DEFAULT_SETTINGS), store.get(KEYS.settings, DEFAULT_SETTINGS));

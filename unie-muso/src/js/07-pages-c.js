@@ -111,10 +111,34 @@ PAGES.rapport = function () {
   if (DB.demandes_pret.some((d) => d.statut === 'En attente')) reco.push('Des demandes de prêt attendent l’évaluation du comité.');
   if (!reco.length) reco.push('Situation saine : continuer le suivi régulier des cotisations et des remboursements.');
 
+  // Résumé (fenêtre + texte à partager sur WhatsApp)
+  const enCours = DB.prets.filter((x) => x.status !== 'Remboursé' && parseD(x.date) <= to);
+  const lines = [
+    ['Réunion', heldMeeting ? longDate(meet) + ' — ' + (att.length - absents.length) + ' présent(s) sur ' + att.length : 'aucune réunion enregistrée (prévue le ' + longDate(meet) + ')'],
+    ['Absents', heldMeeting ? (absents.length ? absents.map((a) => memberName(a.m)).join(', ') : 'aucun') : '—'],
+    ['Cotisations du mois', money(totCot) + ' (' + cots.length + ' versements — Verte ' + fmt(sum(cots, (c) => c.verte)) + ', Rouge ' + fmt(sum(cots, (c) => c.rouge)) + ')'],
+    ['Amendes encaissées', money(sum(am, (a) => a.montant)) + ' (' + am.length + ')'],
+    ['Remboursements de prêts', money(sum(rmb, (x) => x.montant)) + ' dont ' + money(sum(rmb, (x) => x.int)) + ' d’intérêts'],
+    ['Nouveaux prêts', pretsM.length ? pretsM.length + ' — ' + money(sum(pretsM, (x) => x.capital)) : 'aucun'],
+    ['Demandes de prêt', demM.length ? demM.length + ' (' + demM.filter((d) => d.statut === 'Approuvée').length + ' approuvée(s))' : 'aucune'],
+    ['Prêts en cours', enCours.length + ' — reste à rembourser ' + money(sum(enCours, (x) => loanTotals(x).reste))],
+    ['Banque CAP-AIDER', money(T.banque) + (T.caisse ? ' · caisse ' + money(T.caisse) : '')],
+    ['Caisse Verte / Rouge', money(T.verteFonds) + ' / ' + money(T.rougeFonds)],
+    ['Actif total', money(T.actif) + ' · résultat du mois ' + money(F.resultat)],
+    ['Membres en retard', enRetard.length ? enRetard.length + ' — ' + money(sum(enRetard, (s) => s.reste)) + ' : ' + enRetard.map((s) => memberName(s.member)).join(', ') : 'aucun'],
+  ];
+  window.__rapportResume = {
+    title: 'Résumé — ' + monthLabel(key),
+    html: '<div class="report-head" style="margin-bottom:12px">' + logoImg() + '<div><div class="t1">UNIE-MUSO</div><div class="t2">Résumé du rapport — ' + esc(monthLabel(key)) + '</div></div></div>' +
+      '<dl class="dl" style="grid-template-columns:190px 1fr">' + lines.map((l) => '<dt>' + esc(l[0]) + '</dt><dd>' + esc(l[1]) + '</dd>').join('') + '</dl>' +
+      '<h4 style="margin:16px 0 6px;color:var(--navy)">Recommandations</h4><ol style="margin:0;padding-left:20px">' + reco.map((r) => '<li style="margin-bottom:4px">' + esc(r) + '</li>').join('') + '</ol>',
+    text: 'UNIE-MUSO — Résumé du rapport ' + monthLabel(key) + '\n\n' + lines.map((l) => '• ' + l[0] + ' : ' + l[1]).join('\n') +
+      '\n\nRecommandations :\n' + reco.map((r, i) => (i + 1) + '. ' + r).join('\n') + '\n\n' + SETTINGS.sign_tresorier + ', Trésorier',
+  };
   const sec = (n, title, body) => '<h2>' + n + '. ' + esc(title) + '</h2>' + body;
   return '<div class="no-print">' + pageHead('Rapports', t('rapport'), 'Modèle en 9 sections, prêt à imprimer ou enregistrer en PDF',
     '<select data-change="rmonth">' + months.slice().reverse().map((k) => '<option value="' + k + '"' + (k === key ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
-    '<button class="btn btn-primary" onclick="window.print()">' + t('print') + ' / PDF</button>') + '</div>' +
+    '<button class="btn btn-accent" data-act="rapportResume">Résumé du rapport</button><button class="btn btn-primary" onclick="window.print()">' + t('print') + ' / PDF</button>') + '</div>' +
     '<article class="report">' +
       '<div class="report-head">' + logoImg() + '<div><div class="t1">UNIE-MUSO</div><div class="t2">Unie Mutuelle Solidarité · Petit-Goâve, Haïti</div></div>' +
         '<div class="t3"><b>RAPPORT MENSUEL</b><br>' + esc(monthLabel(key)) + '<br><span class="muted">établi le ' + fmtD(today()) + '</span></div></div>' +
@@ -145,6 +169,25 @@ PAGES.rapport = function () {
       '<div class="sig"><div>' + esc(SETTINGS.sign_presidente) + '<br>Présidente</div><div>' + esc(SETTINGS.sign_tresorier) + '<br>Trésorier</div></div>' +
     '</article>';
 };
+ACTIONS.rapportResume = () => {
+  const r = window.__rapportResume; if (!r) return;
+  openModal({
+    title: r.title, wide: true, body: '<div id="resume-box">' + r.html + '</div>',
+    footLeft: '<button type="button" class="btn btn-accent" data-act="resumeCopy">Copier pour WhatsApp</button><button type="button" class="btn" data-act="resumePrint">' + t('print') + '</button>',
+  });
+};
+ACTIONS.resumeCopy = () => {
+  const txt = window.__rapportResume.text;
+  const done = () => toast('Résumé copié : collez-le dans WhatsApp.', 'ok');
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt, done)); } else fallbackCopy(txt, done);
+};
+function fallbackCopy(txt, done) {
+  const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (_e) { toast('Copie impossible : sélectionnez le texte manuellement.', 'err'); }
+  ta.remove();
+}
+ACTIONS.resumePrint = () => printHTML(window.__rapportResume.title, '<div class="report">' + window.__rapportResume.html + '</div>');
 ACTIONS.rmonth = (_i, el) => { STATE.rmonth = el.value; render(); };
 ACTIONS.rnote = (key, el) => { SETTINGS.report_notes = Object.assign({}, SETTINGS.report_notes, { [key]: el.value }); saveSettings(); toast('Remarques enregistrées.', 'ok'); render(); };
 
@@ -344,13 +387,15 @@ ACTIONS.userEdit = (id) => {
   openModal({
     title: id ? 'Compte ' + id : 'Nouveau compte', submit: t('save'),
     body: '<div class="form-grid">' + field('Identifiant', input('id', id || '', id ? 'readonly' : 'required autocapitalize="off"')) + field('Rôle', select('role', [{ v: 'admin', l: 'Administrateur' }, { v: 'caissier', l: 'Caissier' }], u.role)) +
-      field('Nom complet', input('fullname', u.fullname)) + field('Fonction', input('position', u.position)) + field('Mot de passe', input('pwd', u.pwd, 'required autocapitalize="off"'), 'full') + '</div>',
+      field('Nom complet', input('fullname', u.fullname)) + field('Fonction', input('position', u.position)) +
+      field('Membre correspondant', select('member_code', [{ v: '', l: 'Aucun' }].concat(memberOptions()), u.member_code || ''), '', 'Empêche cette personne de noter ou décider sa propre demande de crédit.') +
+      field('Mot de passe', input('pwd', u.pwd, 'required autocapitalize="off"')) + '</div>',
     onSubmit: (v) => {
       const k = (id || v.id || '').trim().toLowerCase();
       if (!k || !v.pwd) { toast('Identifiant et mot de passe obligatoires.', 'err'); return false; }
       if (!id && (USERS[k] || getMember(k.toUpperCase()))) { toast('Cet identifiant existe déjà.', 'err'); return false; }
       if (id === SESSION.id && v.role !== 'admin' && Object.keys(USERS).filter((x) => USERS[x].role === 'admin').length <= 1) { toast('Il faut garder au moins un administrateur.', 'err'); return false; }
-      USERS[k] = { pwd: v.pwd, role: v.role, fullname: v.fullname, position: v.position }; saveUsers(); toast('Compte enregistré.', 'ok'); render();
+      USERS[k] = { pwd: v.pwd, role: v.role, fullname: v.fullname, position: v.position, member_code: v.member_code }; saveUsers(); toast('Compte enregistré.', 'ok'); render();
     },
   });
 };

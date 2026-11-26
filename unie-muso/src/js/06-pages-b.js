@@ -229,7 +229,8 @@ function movTable(acc) {
 PAGES.caisse = function () {
   const T = treasury();
   return pageHead('Trésorerie', t('caisse'), 'Liquidité physique en main — normalement zéro : tout est déposé à CAP-AIDER',
-    canEdit() ? '<button class="btn btn-primary" data-act="trfNew" data-id="depot">Déposer à la banque</button><button class="btn" data-act="trfNew" data-id="retrait">Retrait banque → caisse</button>' : '') +
+    canEdit() ? '<button class="btn btn-primary" data-act="trfNew" data-id="depot">Déposer à la banque</button><button class="btn" data-act="trfNew" data-id="retrait">Retrait banque → caisse</button>' +
+      (isAdmin() ? '<button class="btn btn-accent" data-act="allToBank">Tout passer en banque</button>' : '') : '') +
     '<div class="kpis">' + kpi('Solde de la caisse', fmt(T.caisse) + ' <small>HTG</small>', T.caisse ? 'à déposer à CAP-AIDER' : 'rien en main', T.caisse ? 'orange' : 'green', T.caisse < 0 ? 'neg' : '') + '</div>' +
     panel('Mouvements de caisse', movTable(1010), { flush: true });
 };
@@ -247,3 +248,18 @@ ACTIONS.trfNew = (sens) => openModal({
     field('Référence (fiche de dépôt)', input('ref', ''), 'full') + '</div>',
   onSubmit: (d) => { if (num(d.montant) <= 0) { toast('Montant invalide.', 'err'); return false; } DB.transferts.push({ date: fmtD(d.date), montant: num(d.montant), sens: sens === 'retrait' ? 'retrait' : 'depot', ref: d.ref }); saveDB(); toast('Mouvement enregistré.', 'ok'); render(); },
 });
+
+/* Passe toutes les opérations en « Banque CAP-AIDER » (tout l'argent de la mutuelle est à la banque) */
+ACTIONS.allToBank = () => {
+  const groups = [
+    ['cotisation(s)', DB.cotisations], ['amende(s)', DB.amendes_paid], ['dépense(s)', DB.depenses], ['prêt(s) remis', DB.prets],
+    ['remboursement(s)', [].concat(...DB.prets.map((p) => p.payments || []))],
+  ].map(([l, arr]) => [l, arr.filter((x) => x.mode === CASH)]);
+  const n = sum(groups, (g) => g[1].length);
+  if (!n) { toast('Toutes les opérations sont déjà en Banque CAP-AIDER.', 'ok'); return; }
+  confirmBox('Tout passer en banque', 'Les opérations suivantes passeront de « Liquidité » à « Banque CAP-AIDER » :<ul>' + groups.filter((g) => g[1].length).map((g) => '<li>' + g[1].length + ' ' + g[0] + '</li>').join('') + '</ul>' +
+    '<span class="muted">Les dépôts et retraits caisse ↔ banque déjà saisis restent inchangés. Vous pourrez toujours repasser une ligne en Liquidité.</span>', () => {
+    groups.forEach((g) => g[1].forEach((x) => { x.mode = BANK; }));
+    saveDB(); toast(n + ' opération(s) passée(s) en Banque CAP-AIDER.', 'ok'); render();
+  }, 'Tout passer en banque');
+};

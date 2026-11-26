@@ -9,6 +9,15 @@ function evalBadge(ev) {
 }
 function canGradeAll() { return isAdmin(); }
 function myComiteCode() { const m = currentMember(); return m && m.is_comite ? m.code : null; }
+/* Code membre de la personne connectée (portail membre, ou compte de gestion relié à un membre) */
+function mySelfCode() {
+  if (!SESSION) return null;
+  if (SESSION.type === 'member') return SESSION.code;
+  const u = USERS[SESSION.id]; return u && u.member_code ? u.member_code : null;
+}
+/* Conflit d'intérêts : personne ne note, ne décide ni ne crée le prêt de sa propre demande */
+function isOwnDemande(d) { return !!d && mySelfCode() === d.code_membre; }
+function ownBlock(d) { if (isOwnDemande(d)) { toast('Vous ne pouvez pas noter ni décider votre propre demande de crédit.', 'err'); return true; } return false; }
 
 PAGES.demandes = function () {
   const f = STATE.dfilt || '';
@@ -16,14 +25,15 @@ PAGES.demandes = function () {
   const me = myComiteCode();
   const rows = list.map((d) => {
     const ev = evaluateDemande(d);
-    const mine = me && d.evaluation && d.evaluation.notes_comite && d.evaluation.notes_comite[me] !== undefined;
+    const mine = isOwnDemande(d) || (me && d.evaluation && d.evaluation.notes_comite && d.evaluation.notes_comite[me] !== undefined);
     return '<tr><td class="code">#' + d.id + '</td><td class="num">' + esc(d.date_demande) + '</td><td><span class="code">' + d.code_membre + '</span> ' + esc(nameOf(d.code_membre)) + '</td>' +
       '<td class="n">' + fmt(d.montant_demande) + '</td><td>' + esc(d.motif || '') + '</td>' +
       '<td class="n">' + fmt(ev.pres + ev.cot + ev.cred) + '<span class="muted">/80</span></td><td>' + evalBadge(ev) + '</td><td class="n">' + (ev.montant !== null ? fmt(ev.montant) : '—') + '</td>' +
       '<td>' + statusBadge(d.statut) + (d.montant_approuve && d.statut === 'Approuvée' ? '<div class="muted num" style="font-size:11px">' + fmt(d.montant_approuve) + ' · ' + d.duree_approuvee + ' mois</div>' : '') + '</td>' +
       '<td class="act"><button class="btn btn-sm' + (me && !mine && d.statut === 'En attente' ? ' btn-accent' : '') + '" data-act="demEval" data-id="' + d.id + '">' + (me && !mine ? 'Donner ma note' : 'Grille') + '</button>' +
-      (canGradeAll() || me ? '<button class="btn btn-sm" data-act="demDecide" data-id="' + d.id + '">Décision</button>' : '') +
-      (d.statut === 'Approuvée' && num(d.montant_approuve) > 0 && !d.pret_id && (isAdmin() || currentRole() === 'comite' || currentRole() === 'caissier') ? '<button class="btn btn-sm btn-primary" data-act="demCreateLoan" data-id="' + d.id + '">Créer le prêt →</button>' : '') +
+      ((canGradeAll() || me) && !isOwnDemande(d) ? '<button class="btn btn-sm" data-act="demDecide" data-id="' + d.id + '">Décision</button>' : '') +
+      (isOwnDemande(d) ? '<span class="badge b-grey" title="Conflit d’intérêts">votre demande</span>' : '') +
+      (d.statut === 'Approuvée' && num(d.montant_approuve) > 0 && !d.pret_id && !isOwnDemande(d) && (isAdmin() || currentRole() === 'comite' || currentRole() === 'caissier') ? '<button class="btn btn-sm btn-primary" data-act="demCreateLoan" data-id="' + d.id + '">Créer le prêt →</button>' : '') +
       (d.pret_id && canSee('prets') ? '<button class="btn btn-sm" data-act="openLoan" data-id="' + d.pret_id + '">Prêt #' + d.pret_id + '</button>' : '') + '</td></tr>';
   });
   return pageHead('Gestion', t('demandes'), 'Grille officielle : rubriques 1 à 3 calculées automatiquement (80 pts), rubrique 4 = moyenne des notes des membres du comité (20 pts). La décision finale revient au comité.',
@@ -91,8 +101,12 @@ function gridTableHTML(d, editable) {
   h += sec('4. Appréciation du comité — ' + GRILLE.pts_comite + ' pts (moyenne des notes des membres du comité)');
   const me = myComiteCode(); const notes = (d.evaluation && d.evaluation.notes_comite) || {};
   comiteMembers().forEach((m) => {
+    if (m.code === d.code_membre) {
+      h += '<tr><td>' + esc(memberName(m)) + (m.comite_poste ? ' <span class="muted">(' + esc(m.comite_poste) + ')</span>' : '') + '</td><td colspan="3" class="muted">Demandeur — ne note pas sa propre demande (non compté dans la moyenne)</td></tr>';
+      return;
+    }
     const v = notes[m.code];
-    const mayEdit = editable && (canGradeAll() || me === m.code);
+    const mayEdit = editable && !isOwnDemande(d) && (canGradeAll() || me === m.code);
     h += '<tr><td>' + esc(memberName(m)) + (m.comite_poste ? ' <span class="muted">(' + esc(m.comite_poste) + ')</span>' : '') + '</td><td class="c muted">/ ' + GRILLE.pts_comite + '</td><td class="c">' + (v === undefined || v === '' ? '<span class="muted">en attente</span>' : '') + '</td>' +
       '<td class="n">' + (mayEdit ? '<input name="note_' + m.code + '" type="number" step="0.5" min="0" max="' + GRILLE.pts_comite + '" value="' + (v === undefined ? '' : v) + '" style="width:70px;text-align:right">' : (v === undefined || v === '' ? '—' : '<b class="num">' + fmt(v) + '</b>')) + '</td></tr>';
   });
@@ -106,10 +120,11 @@ function gridTableHTML(d, editable) {
 }
 ACTIONS.demEval = (id) => {
   const d = DB.demandes_pret.find((x) => +x.id === +id);
-  const editable = d.statut === 'En attente' && (canGradeAll() || !!myComiteCode());
+  const editable = d.statut === 'En attente' && !isOwnDemande(d) && (canGradeAll() || !!myComiteCode());
   openModal({
     title: 'Grille d’évaluation — ' + nameOf(d.code_membre), wide: true, submit: editable ? t('save') : null,
-    body: '<div class="banner soft">Demande #' + d.id + ' du ' + esc(d.date_demande) + ' · <b class="num">' + money(d.montant_demande) + '</b> · ' + esc(d.motif || '') + '</div>' + gridTableHTML(d, editable) +
+    body: '<div class="banner soft">Demande #' + d.id + ' du ' + esc(d.date_demande) + ' · <b class="num">' + money(d.montant_demande) + '</b>' + (d.motif ? ' · ' + esc(d.motif) : '') + '</div>' +
+      (isOwnDemande(d) ? '<div class="banner import">C’est votre propre demande : vous pouvez consulter la grille, mais pas la noter ni la décider.</div>' : '') + gridTableHTML(d, editable) +
       (canGradeAll() && editable ? '<div class="muted" style="margin-top:8px">Les rubriques 1 à 3 sont calculées automatiquement ; le trésorier peut les corriger (ex. : ayant droit présent non saisi).</div>' : ''),
     footLeft: '<button type="button" class="btn" data-act="demEvalPrint" data-id="' + d.id + '">' + t('print') + '</button>',
     onSubmit: (v) => {
@@ -119,6 +134,7 @@ ACTIONS.demEval = (id) => {
       for (const k of Object.keys(v)) {
         if (k.startsWith('note_')) {
           const code = k.slice(5);
+          if (code === d.code_membre) continue;
           if (v[k] === '') { delete d.evaluation.notes_comite[code]; continue; }
           const n = num(v[k]); if (n < 0 || n > max) { toast('Note du comité entre 0 et ' + max + '.', 'err'); return false; }
           d.evaluation.notes_comite[code] = n;
@@ -159,8 +175,9 @@ ACTIONS.grillePrint = () => printHTML('Grille d’évaluation', gridPrintSheet(n
 
 ACTIONS.demDecide = (id) => {
   const d = DB.demandes_pret.find((x) => +x.id === +id);
+  if (ownBlock(d)) return;
   const ev = evaluateDemande(d);
-  const present = comiteMembers().filter((m) => d.evaluation && d.evaluation.notes_comite && d.evaluation.notes_comite[m.code] !== undefined)
+  const present = comiteMembers().filter((m) => m.code !== d.code_membre && d.evaluation && d.evaluation.notes_comite && d.evaluation.notes_comite[m.code] !== undefined)
     .map((m) => memberName(m) + (m.comite_poste ? ' (' + m.comite_poste + ')' : '')).join(', ');
   openModal({
     title: 'Décision du comité — demande #' + d.id, submit: t('save'), wide: true,
@@ -182,6 +199,7 @@ ACTIONS.demDecide = (id) => {
 };
 ACTIONS.demCreateLoan = (id) => {
   const d = DB.demandes_pret.find((x) => +x.id === +id);
+  if (ownBlock(d)) return;
   confirmBox('Créer le prêt', 'Créer un prêt de <b>' + money(d.montant_approuve) + '</b> sur ' + d.duree_approuvee + ' mois' + (d.grace_approuve ? ' (+1 mois de grâce)' : '') + ' pour ' + esc(nameOf(d.code_membre)) + ', daté du ' + esc(d.date_decision) + ' ?', () => {
     const p = createLoanFromDemande(d); saveDB(); toast('Prêt #' + p.id + ' créé avec son échéancier.', 'ok');
     if (canSee('prets')) go('prets', p.id); else render();
