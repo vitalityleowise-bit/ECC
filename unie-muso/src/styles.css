@@ -287,6 +287,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .report { padding: 18px 14px; }
   .dl { grid-template-columns: 110px 1fr; }
   .kpi { border-bottom: 1px solid var(--line-soft); }
+  .panel-head { flex-wrap: wrap; }
+  .panel-head .right { margin-left: 0; width: 100%; flex-wrap: wrap; }
 }
 
 .only-print { display: none; }

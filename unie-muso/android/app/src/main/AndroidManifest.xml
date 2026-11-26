@@ -33,12 +33,20 @@
                 <data android:mimeType="application/x-unimiso" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- Fichiers, Gmail, Drive, Bluetooth : le type annoncé varie selon l'application ;
+                 UNIE-MUSO accepte tout fichier et vérifie son contenu avant d'importer. -->
+            <intent-filter android:label="Importer dans UNIE-MUSO">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
             <intent-filter android:label="Importer dans UNIE-MUSO">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/octet-stream" />
-                <data android:mimeType="application/json" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
 

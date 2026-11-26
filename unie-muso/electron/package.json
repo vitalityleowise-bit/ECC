@@ -1,7 +1,7 @@
 {
   "name": "unie-muso",
   "productName": "UNIE-MUSO",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Gestion de la mutuelle de solidarité UNIE-MUSO (Petit-Goâve)",
   "author": "UNIE-MUSO",
   "main": "main.js",

@@ -334,6 +334,27 @@ ACTIONS.docEdit = (id) => {
 };
 
 /* ---------- Portail membre ---------- */
+/* Résumé du rapport mensuel visible par tous les membres, directement dans « Mon compte » */
+function lastReportMonth() {
+  const withData = activityMonths().filter((k) => DB.cotisations.some((c) => monthKey(c.date) === k));
+  return withData.length ? withData[withData.length - 1] : monthKey(today());
+}
+function memberResumePanel() {
+  const key = STATE.mrmonth || lastReportMonth();
+  const keep = { rmonth: STATE.rmonth, r: window.__rapportResume };
+  STATE.rmonth = key;
+  try { PAGES.rapport(); } catch (_e) { /* le rapport complet reste disponible */ }
+  const r = window.__rapportResume;
+  STATE.rmonth = keep.rmonth;
+  const months = activityMonths().filter((k) => k <= monthKey(today())).reverse();
+  return '<section class="panel"><div class="panel-head"><h2>Résumé du rapport mensuel</h2>' +
+    '<div class="right"><select data-change="mrmonth" style="padding:4px 6px;border:1px solid var(--line);border-radius:5px">' + months.map((k) => '<option value="' + k + '"' + (k === key ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
+    '<button class="btn btn-sm" data-act="mrOpen">Plein écran</button><button class="btn btn-sm btn-primary" data-act="mrFull">Rapport complet</button></div></div>' +
+    '<div class="panel-body" style="max-height:420px;overflow-y:auto">' + resumeBody(r, false) + '</div></section>';
+}
+ACTIONS.mrmonth = (_i, el) => { STATE.mrmonth = el.value; render(); };
+ACTIONS.mrOpen = () => { STATE.rmonth = STATE.mrmonth || lastReportMonth(); PAGES.rapport(); ACTIONS.rapportResume(); };
+ACTIONS.mrFull = () => { STATE.rmonth = STATE.mrmonth || lastReportMonth(); go('rapport'); };
 PAGES.moncompte = function () {
   const m = currentMember(); if (!m) return '';
   const s = memberStats(m.code); const sc = creditScore(m.code);
@@ -350,6 +371,7 @@ PAGES.moncompte = function () {
       return '<tr><td class="code">#' + d.id + '</td><td>' + esc(nameOf(d.code_membre)) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + (n === undefined ? '<span class="badge b-orange">à donner</span>' : '<b class="num">' + fmt(n) + '/' + GRILLE.pts_comite + '</b>') + '</td>' +
         '<td class="act"><button class="btn btn-sm btn-accent" data-act="demEval" data-id="' + d.id + '">' + (n === undefined ? 'Donner ma note' : 'Voir / modifier') + '</button></td></tr>';
     })), { flush: true }) : '') +
+    memberResumePanel() +
     '<div class="kpis">' + kpi('Caisse Verte', fmt(s.verte) + ' <small>HTG</small>', 'mon épargne', 'green') + kpi('Caisse Rouge', fmt(s.rouge) + ' <small>HTG</small>', 'solidarité', 'red') +
       kpi('Total versé', fmt(s.total) + ' <small>HTG</small>', '', 'navy') + kpi('Reste dû', fmt(s.reste) + ' <small>HTG</small>', s.statut, s.reste ? 'orange' : 'green') + '</div>' +
     '<div class="grid-2"><div>' +
