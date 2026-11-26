@@ -1,0 +1,57 @@
+UNIE-MUSO — Guide de création du projet Firebase (environ 15 minutes)
+=====================================================================
+
+À faire depuis un ordinateur (plus simple que sur téléphone), avec le compte Gmail
+du trésorier. Formule GRATUITE « Spark » : aucune carte bancaire n'est demandée.
+Si Firebase propose de passer à la formule « Blaze » (payante) : refuser.
+
+ÉTAPE 1 — Créer le projet
+  1. Ouvrir https://console.firebase.google.com et se connecter avec le Gmail.
+  2. Cliquer « Créer un projet » (ou « Ajouter un projet »).
+  3. Nom du projet : unie-muso   → Continuer.
+  4. Accepter les conditions → Continuer.
+  5. Google Analytics : DÉSACTIVER (inutile) → « Créer le projet ».
+  6. Attendre la fin, puis « Continuer ».
+
+ÉTAPE 2 — Créer la base de données (Firestore)
+  1. Menu de gauche : « Créer » (Build) > « Firestore Database ».
+  2. Cliquer « Créer une base de données ».
+  3. Édition : « Standard » si on vous le demande.
+  4. Emplacement : us-east1 (Caroline du Sud) — le plus proche d'Haïti.
+     ATTENTION : ce choix est définitif.
+  5. Mode : « Démarrer en mode production » → « Créer ».
+
+ÉTAPE 3 — Activer la connexion des membres (Authentication)
+  1. Menu de gauche : « Créer » > « Authentication » > « Commencer ».
+  2. Onglet « Mode de connexion » : choisir « Adresse e-mail/Mot de passe ».
+  3. Activer le PREMIER interrupteur (pas « Lien par e-mail ») → « Enregistrer ».
+
+ÉTAPE 4 — Déclarer l'application web
+  1. En haut à gauche, roue dentée ⚙ > « Paramètres du projet ».
+  2. En bas, section « Vos applications » : cliquer l'icône  </>  (Web).
+  3. Surnom de l'application : UNIE-MUSO
+  4. NE PAS cocher « Firebase Hosting » pour l'instant → « Enregistrer l'application ».
+  5. Firebase affiche un bloc de code qui ressemble à :
+        const firebaseConfig = {
+          apiKey: "...",
+          authDomain: "unie-muso-xxxx.firebaseapp.com",
+          projectId: "unie-muso-xxxx",
+          storageBucket: "...",
+          messagingSenderId: "...",
+          appId: "..."
+        };
+  6. Copier tout ce bloc et l'envoyer à Claude dans la conversation.
+     (Ces informations identifient le projet ; ce ne sont pas des mots de passe.
+      La sécurité est assurée par les règles d'accès que Claude va écrire.)
+
+CE QU'IL NE FAUT JAMAIS ENVOYER
+  - Le mot de passe du Gmail.
+  - Un fichier « clé privée » / « compte de service » (.json) sauf si Claude
+    l'explique précisément et pourquoi.
+
+ENSUITE (Claude s'en charge, avec des consignes simples pour vous)
+  - Règles de sécurité de la base (qui voit quoi).
+  - Comptes : trésorier (admin), caissier, membres, comité.
+  - Transfert des données actuelles (19 membres, cotisations, amendes, prêts).
+  - Notifications (rappels de réunion, messages, confirmations).
+  - Lien en ligne pour iPhone et PC (Firebase Hosting, gratuit).
