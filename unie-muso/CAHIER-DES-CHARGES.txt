@@ -68,3 +68,23 @@ G. DÉCISIONS VALIDÉES
    3. Un membre du comité ne note ni ne décide sa propre demande de crédit.
    4. Le résumé du rapport est un texte rédigé (actif, passif, capitaux, produits,
       charges, crédit, points d'attention), modifiable par le trésorier.
+
+H. DÉPÔT BANCAIRE DÉCLARÉ PAR LE MEMBRE (fiche de dépôt)
+   Règlement chap. II art. 4 : le membre garde sa fiche de dépôt et la remet au trésorier.
+   1. Dans « Mon compte », le membre touche « Déclarer un dépôt » :
+      - il prend la PHOTO de sa fiche de dépôt CAP-AIDER (appareil photo) ou la choisit
+        dans la galerie ;
+      - il indique la date du dépôt, le montant, le numéro de la fiche et l'objet
+        (cotisation, remboursement de prêt, amende).
+   2. La déclaration arrive « En attente de validation » chez le trésorier (et le comité
+      si autorisé), avec une notification.
+   3. Le trésorier ouvre la photo, compare avec le relevé bancaire, puis :
+      - VALIDE → la cotisation / le remboursement / l'amende est enregistré
+        automatiquement en « Banque CAP-AIDER », avec la photo jointe comme pièce
+        justificative et un message de remerciement au membre ;
+      - ou REFUSE avec un motif (photo illisible, montant différent…) → le membre
+        est notifié et peut corriger.
+   4. Le membre voit l'état de ses déclarations (en attente, validée, refusée).
+   5. Si la fiche ne peut pas être prouvée : frais de recherche 250 HTG (règlement).
+   Dépend de la version en ligne (A) pour que la déclaration arrive chez le trésorier.
+   Message de la demande interrompu : compléments à recevoir.
