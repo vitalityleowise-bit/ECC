@@ -188,6 +188,7 @@ function go(page, param) {
   if (!canSee(page)) { toast('Accès non autorisé.', 'err'); return; }
   STATE.page = page; STATE.param = param === undefined ? null : param;
   const def = PAGE_DEFS.find((p) => p.id === page); if (def) setGroupOpen(def.g, true);
+  STATE.menuOpen = false;
   document.querySelector('.app') && document.querySelector('.app').classList.remove('menu-open');
   render(); window.scrollTo(0, 0);
 }
@@ -282,8 +283,13 @@ function bindGlobal() {
   const root = document.getElementById('root');
   root.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(b.dataset.go, b.dataset.param)));
   const lo = root.querySelector('[data-logout]'); if (lo) lo.addEventListener('click', logout);
-  const mb = root.querySelector('[data-menu]'); if (mb) mb.addEventListener('click', () => root.querySelector('.app').classList.toggle('menu-open'));
-  const mc = root.querySelector('[data-menu-close]'); if (mc) mc.addEventListener('click', () => root.querySelector('.app').classList.remove('menu-open'));
+  // Menu sur téléphone : son état survit au réaffichage (dérouler un groupe ne le ferme pas)
+  const app = root.querySelector('.app');
+  if (app && STATE.menuOpen) app.classList.add('menu-open');
+  const mb = root.querySelector('[data-menu]'); if (mb) mb.addEventListener('click', () => { STATE.menuOpen = !app.classList.contains('menu-open'); app.classList.toggle('menu-open', STATE.menuOpen); });
+  const mc = root.querySelector('[data-menu-close]'); if (mc) mc.addEventListener('click', () => { STATE.menuOpen = false; app.classList.remove('menu-open'); });
+  const sb = root.querySelector('.sidebar'); if (sb && STATE.sbScroll) sb.scrollTop = STATE.sbScroll;
+  if (sb) sb.addEventListener('scroll', () => { STATE.sbScroll = sb.scrollTop; }, { passive: true });
 }
 /* Choix de la langue pour soi seul : enregistré sur sa fiche (membre) ou son compte (gestion) */
 function setMyLang(l) {

@@ -148,7 +148,7 @@ PAGES.depenses = function () {
   const list = DB.depenses.map((d, i) => Object.assign({ i }, d)).filter((d) => !fm || monthKey(d.date) === fm).sort((a, b) => parseD(b.date) - parseD(a.date));
   const byMonth = months.map((k) => { const ds = DB.depenses.filter((d) => monthKey(d.date) === k); return { k, n: ds.length, t: sum(ds, (d) => d.montant) }; }).filter((x) => x.n);
   const rows = list.map((d) => '<tr><td class="num">' + esc(d.date) + '</td><td class="code">' + esc(d.piece || '') + '</td><td>' + esc(d.beneficiaire || '') + '</td><td>' + esc(d.categorie) + '</td>' +
-    '<td>' + esc(d.caisse || '') + '</td><td>' + (d.retrait ? 'Caisse <span class="muted" style="font-size:11px">(retrait CAP-AIDER)</span>' : esc(d.mode === CASH ? 'Caisse' : (d.mode || BANK))) + '</td><td class="n">' + fmt(d.montant) + '</td>' +
+    '<td style="max-width:260px;white-space:pre-wrap">' + (d.explication ? esc(d.explication) : '<span class="muted">—</span>') + '</td><td>' + (d.retrait ? 'Caisse <span class="muted" style="font-size:11px">(retrait CAP-AIDER)</span>' : esc(d.mode === CASH ? 'Caisse' : (d.mode || BANK))) + '</td><td class="n">' + fmt(d.montant) + '</td>' +
     '<td class="act">' + (d.recu ? '<button class="btn btn-sm" data-act="depRecu" data-id="' + d.i + '">Reçu</button>' : '') +
     (canEdit() ? '<button class="btn btn-sm" data-act="depEdit" data-id="' + d.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="depDel" data-id="' + d.i + '">' + t('del') + '</button>' : '') + '</td></tr>');
   const byCat = DEP_CATS.map((c) => '<tr><td>' + esc(c.label) + '</td><td class="code">' + c.acc + '</td><td class="n">' + fmt(sum(DB.depenses.filter((d) => d.categorie === c.label), (d) => d.montant)) + '</td></tr>');
@@ -157,7 +157,7 @@ PAGES.depenses = function () {
       months.map((k) => '<option value="' + k + '"' + (k === fm ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
       (canEdit() && fm ? '<button class="btn btn-sm btn-primary" data-act="depNew" data-id="' + fm + '">Ajouter une dépense en ' + esc(monthLabel(fm).toLowerCase()) + '</button>' : '') +
       '<span class="muted" style="margin-left:auto">' + list.length + ' · ' + money(sum(list, (d) => d.montant)) + '</span></div>' +
-      table(['Date', 'Pièce', 'Bénéficiaire', 'Catégorie', 'Caisse', 'Payé par', ['Montant', 'n'], ''], rows,
+      table(['Date', 'Pièce', 'Bénéficiaire', 'Catégorie', 'Explication', 'Payé par', ['Montant', 'n'], ''], rows,
         '<tr><td colspan="6">Total' + (fm ? ' ' + esc(monthLabel(fm).toLowerCase()) : '') + '</td><td class="n">' + fmt(sum(list, (d) => d.montant)) + '</td><td></td></tr>') + '</section><div>' +
     panel('Total par mois', table(['Mois', ['Nb', 'n'], ['Total', 'n']], byMonth.map((x) => '<tr class="clickable" data-act="depMonthGo" data-id="' + x.k + '"><td>' + monthLabel(x.k) + '</td><td class="n">' + x.n + '</td><td class="n">' + fmt(x.t) + '</td></tr>'),
       '<tr><td>Total</td><td class="n">' + DB.depenses.length + '</td><td class="n">' + fmt(sum(DB.depenses, (d) => d.montant)) + '</td></tr>'), { flush: true }) +
@@ -172,7 +172,8 @@ function depForm(d) {
       return select('benef_sel', [{ v: '', l: '— Choisir un membre —' }].concat(opts).concat([{ v: '__autre', l: 'Autre (banque, fournisseur…)' }]), isMember ? d.beneficiaire : (d.beneficiaire ? '__autre' : '')) +
         '<input name="beneficiaire" value="' + esc(isMember ? '' : (d.beneficiaire || '')) + '" placeholder="Nom du bénéficiaire" style="margin-top:6px' + (isMember || !d.beneficiaire ? ';display:none' : '') + '">'; })(), 'full') + field('Catégorie', select('categorie', DEP_CATS.map((c) => c.label), d.categorie)) +
     field(t('amount') + ' (HTG)', input('montant', d.montant || '', 'type="number" min="0" step="any" required')) +
-    field('Imputée à', select('caisse', ['Caisse Verte', 'Caisse Rouge'], d.caisse || 'Caisse Verte'), '', 'Secours → Caisse Rouge ; frais courants → produits (Caisse Verte).') +
+    field('Explication de la dépense', '<textarea name="explication" rows="3" placeholder="Pourquoi cette dépense ? Ex. : achat de 20 carnets de cotisation pour les nouveaux membres.">' + esc(d.explication || '') + '</textarea>', 'full',
+      'La caisse (Verte ou Rouge) est choisie automatiquement : secours → Caisse Rouge, autres dépenses → Caisse Verte.') +
     field('Payé par', select('mode', [{ v: CASH, l: 'Caisse (liquidité)' }, { v: BANK, l: 'Directement par la banque CAP-AIDER' }], d.mode || CASH)) +
     '<div class="full" id="ret-box"' + ((d.mode || CASH) === CASH ? '' : ' style="display:none"') + '><label class="check"><input type="checkbox" name="retrait"' + (d.retrait ? ' checked' : '') + '> Retrait fait à CAP-AIDER pour cette dépense</label>' +
       '<div class="muted" style="font-size:11px;margin-top:3px">Le retrait est enregistré automatiquement (banque → caisse) le même jour : la caisse reste à zéro.</div></div>' +
@@ -182,7 +183,8 @@ function depForm(d) {
 function saveDep(v, idx) {
   if (num(v.montant) <= 0) { toast('Montant invalide.', 'err'); return false; }
   const benef = v.benef_sel && v.benef_sel !== '__autre' ? v.benef_sel : (v.beneficiaire || '').trim();
-  const rec = { date: fmtD(v.date), piece: v.piece.trim(), caisse: v.caisse, beneficiaire: benef, categorie: v.categorie, montant: num(v.montant), mode: v.mode, retrait: v.mode === CASH && !!v.retrait, recu: v.recu };
+  // Caisse déduite de la catégorie (règlement : secours → Caisse Rouge ; frais courants → produits / Caisse Verte)
+  const rec = { date: fmtD(v.date), piece: v.piece.trim(), caisse: depAccount(v.categorie) === 5020 ? 'Caisse Rouge' : 'Caisse Verte', explication: (v.explication || '').trim(), beneficiaire: benef, categorie: v.categorie, montant: num(v.montant), mode: v.mode, retrait: v.mode === CASH && !!v.retrait, recu: v.recu };
   if (idx === undefined) DB.depenses.push(rec); else DB.depenses[idx] = rec;
   saveDB(); toast('Dépense enregistrée.', 'ok'); render();
 }
@@ -190,7 +192,6 @@ function bindDepCat(el) {
   const f = el.querySelector('form');
   f.mode.addEventListener('change', () => { el.querySelector('#ret-box').style.display = f.mode.value === CASH ? '' : 'none'; });
   f.benef_sel.addEventListener('change', () => { f.beneficiaire.style.display = f.benef_sel.value === '__autre' ? '' : 'none'; if (f.benef_sel.value === '__autre') f.beneficiaire.focus(); });
-  f.categorie.addEventListener('change', () => { f.caisse.value = depAccount(f.categorie.value) === 5020 ? 'Caisse Rouge' : 'Caisse Verte'; });
 }
 ACTIONS.depNew = (month) => {
   // Dépense d'un mois passé : date proposée au dernier jeudi de ce mois
