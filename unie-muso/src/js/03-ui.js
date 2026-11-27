@@ -187,6 +187,7 @@ function canSee(pageId) {
 function go(page, param) {
   if (!canSee(page)) { toast('Accès non autorisé.', 'err'); return; }
   STATE.page = page; STATE.param = param === undefined ? null : param;
+  const def = PAGE_DEFS.find((p) => p.id === page); if (def) setGroupOpen(def.g, true);
   document.querySelector('.app') && document.querySelector('.app').classList.remove('menu-open');
   render(); window.scrollTo(0, 0);
 }
@@ -243,13 +244,12 @@ function sidebarHTML() {
     groups.map((g) => {
       const link = (p, sub) => '<button class="sb-link' + (sub ? ' sb-sub' : '') + (STATE.page === p.id ? ' active' : '') + '" data-go="' + p.id + '">' + t(p.id) +
         (p.id === 'demandes' && pending ? '<span class="count">' + pending + '</span>' : '') + '</button>';
-      // Comptabilité : un seul bouton qui déroule Plan comptable, Journal, Balance, Bilan, État des résultats
-      if (g.g === 'g_compta') {
-        const open = STATE.openCompta || g.items.some((p) => p.id === STATE.page);
-        return '<div class="sb-group"><button class="sb-link sb-toggle' + (open ? ' open' : '') + '" data-act="toggleCompta" aria-expanded="' + open + '">' + t('g_compta') + '<span class="chev">' + (open ? '▾' : '▸') + '</span></button>' +
-          (open ? g.items.map((p) => link(p, true)).join('') : '') + '</div>';
-      }
-      return '<div class="sb-group"><div class="sb-group-title">' + t(g.g) + '</div>' + g.items.map((p) => link(p)).join('') + '</div>';
+      // Groupe d'une seule page : lien direct, sans titre
+      if (g.items.length === 1) return '<div class="sb-group">' + link(g.items[0]) + '</div>';
+      // Chaque groupe est un bouton qui se déroule ; celui de la page affichée reste ouvert
+      const open = groupOpen(g.g, g.items.some((p) => p.id === STATE.page));
+      return '<div class="sb-group"><button class="sb-link sb-toggle' + (open ? ' open' : '') + '" data-act="toggleGroup" data-id="' + g.g + '" aria-expanded="' + open + '">' + t(g.g) +
+        '<span class="chev">' + (open ? '▾' : '▸') + '</span></button>' + (open ? g.items.map((p) => link(p, true)).join('') : '') + '</div>';
     }).join('') +
     '<div class="sb-foot"><div class="who">' + esc(currentName()) + '</div><div class="role">' +
       esc((u && u.position) || (m && m.comite_poste) || roleLabel) + (m ? ' · ' + m.code : '') + '</div>' +
@@ -293,7 +293,15 @@ function setMyLang(l) {
 }
 /* Délégation d'événements : data-act="nom" data-id="..." */
 const ACTIONS = {};
-ACTIONS.toggleCompta = () => { STATE.openCompta = !(STATE.openCompta || PAGE_DEFS.some((p) => p.g === 'g_compta' && p.id === STATE.page)); render(); };
+/* Groupes du menu ouverts / fermés, mémorisés sur l'appareil (Gestion ouvert la première fois) */
+const MENU_KEY = 'uniemuso-menu-open';
+function menuState() { try { return JSON.parse(store.raw(MENU_KEY) || '{"g_gestion":true}'); } catch (_e) { return { g_gestion: true }; } }
+function groupOpen(g, active) { const st = menuState(); return st[g] === undefined ? !!active : !!st[g]; }
+function setGroupOpen(g, v) { const st = menuState(); st[g] = v; store.rawSet(MENU_KEY, JSON.stringify(st)); }
+ACTIONS.toggleGroup = (g) => {
+  const active = PAGE_DEFS.some((p) => p.g === g && p.id === STATE.page);
+  setGroupOpen(g, !groupOpen(g, active)); render();
+};
 ACTIONS.setLang = (l) => { setMyLang(l); SESSION ? render() : renderLogin(); };
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
