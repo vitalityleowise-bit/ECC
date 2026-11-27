@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.7.2 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.7.3 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -123,6 +123,10 @@ POINTS TECHNIQUES IMPORTANTS
   Connexion d'un membre : si Firebase accepte le mot de passe, il devient le mot de passe local.
   « Dernière connexion des membres » (Paramètres > En ligne) : prefs/{code}.last_seen + app.
   fmtDT affiche maintenant l'heure LOCALE (avant : UTC, 5 h d'avance en Haïti).
+- 3.7.3 : le trésorier peut travailler depuis son téléphone. Le mot de passe « admin » est propre à
+  chaque appareil (USERS, non synchronisé) ; si Firebase accepte le mot de passe saisi, il devient
+  celui de l'appareil. Conflits : un envoi remplace la liste entière (la modification la plus
+  récente gagne) -> travailler sur un appareil à la fois, attendre « tout est synchronisé ».
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer

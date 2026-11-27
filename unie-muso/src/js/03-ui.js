@@ -130,6 +130,8 @@ function onLogin(e) {
   if (typeof onlineFirstLogin === 'function' && onlineAvailable() && navigator.onLine) {
     err.textContent = 'Recherche du compte en ligne…';
     onlineFirstLogin(id, pwd).then((ok) => {
+      // Compte de gestion (trésorier) : Firebase a accepté ce mot de passe → il devient celui de cet appareil
+      if (ok && key && key === 'admin') { USERS[key].pwd = pwd; saveUsers(); SESSION = { type: 'user', id: key }; afterLogin(); return; }
       if (ok && memberLogin(id, pwd)) { afterLogin(); return; }
       // Firebase a accepté ce mot de passe : c'est le bon (changé par le trésorier, pas encore reçu ici)
       const m = ok && DB.members.find((x) => x.code.toLowerCase() === id.toLowerCase() && x.statut !== 'Inactif');
