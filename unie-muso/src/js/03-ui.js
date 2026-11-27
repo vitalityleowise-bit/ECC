@@ -153,7 +153,7 @@ function afterLogin() {
   render();
   tryShowNotifications(true);
 }
-function logout() { if (typeof goOffline === 'function') goOffline(); try { if (window.UnieNative && UnieNative.stopPush) UnieNative.stopPush(); } catch (_e) { /* */ } SESSION = null; STATE = { page: 'dashboard', param: null }; try { localStorage.removeItem(KEYS.session); } catch (_e) { /* */ } renderLogin(); }
+function logout() { if (typeof goOffline === 'function') goOffline(); SESSION = null; STATE = { page: 'dashboard', param: null }; try { localStorage.removeItem(KEYS.session); } catch (_e) { /* */ } renderLogin(); }
 
 /* Pages : groupe, droits d'accès */
 const PAGE_DEFS = [

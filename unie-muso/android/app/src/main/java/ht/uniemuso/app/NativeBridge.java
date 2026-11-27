@@ -97,23 +97,6 @@ public class NativeBridge {
         String p = act.pendingImport; act.pendingImport = ""; return p;
     }
 
-    /** Service de notifications (application fermée) : configuration envoyée après la connexion en ligne. */
-    @JavascriptInterface public void startPush(String json) {
-        android.content.SharedPreferences sp = act.getSharedPreferences(PushService.PREFS, Context.MODE_PRIVATE);
-        String old = sp.getString("conf", "");
-        android.content.SharedPreferences.Editor e = sp.edit().putString("conf", json);
-        if (!old.equals(json)) for (String k : sp.getAll().keySet()) if (k.startsWith("s_")) e.remove(k); // autre compte : repères remis à zéro
-        e.apply();
-        act.runOnUiThread(() -> PushService.start(act));
-    }
-
-    @JavascriptInterface public void stopPush() {
-        act.getSharedPreferences(PushService.PREFS, Context.MODE_PRIVATE).edit().clear().apply();
-        act.stopService(new Intent(act, PushService.class));
-    }
-
-    @JavascriptInterface public boolean pushActive() { return PushService.configured(act); }
-
     @JavascriptInterface public void notify(String title, String body) {
         AlarmReceiver.show(act, (int) (System.currentTimeMillis() % 100000), title, body);
     }
