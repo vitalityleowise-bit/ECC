@@ -131,6 +131,9 @@ function onLogin(e) {
     err.textContent = 'Recherche du compte en ligne…';
     onlineFirstLogin(id, pwd).then((ok) => {
       if (ok && memberLogin(id, pwd)) { afterLogin(); return; }
+      // Firebase a accepté ce mot de passe : c'est le bon (changé par le trésorier, pas encore reçu ici)
+      const m = ok && DB.members.find((x) => x.code.toLowerCase() === id.toLowerCase() && x.statut !== 'Inactif');
+      if (m) { m.portal_password = pwd; store.set(KEYS.db, DB); if (memberLogin(id, pwd)) { afterLogin(); return; } }
       err.textContent = t('login_err');
     });
     return;

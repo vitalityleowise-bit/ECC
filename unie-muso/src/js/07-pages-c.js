@@ -488,7 +488,7 @@ PAGES.sauvegarde = function () {
   const native = hasNative(); const folder = dataFolderLabel();
   const saved = store.raw(SAVED_AT_KEY);
   let size = 0; try { size = (store.raw(KEYS.db) || '').length; } catch (_e) { /* */ }
-  return pageHead('Outils', t('sauvegarde'), saved ? 'Dernière modification : ' + fmtD(saved.slice(0, 10)) + ' à ' + saved.slice(11, 16) : '') +
+  return pageHead('Outils', t('sauvegarde'), saved ? 'Dernière modification : ' + fmtDT(saved).replace(' ', ' à ') : '') +
     (native ? '<div class="banner soft"><span class="bt">Dossier des données</span><span class="num">' + esc(folder) + '</span><span class="muted">— enregistrement automatique à chaque modification + copie quotidienne dans « sauvegardes »</span>' +
       (UnieNative.openFolder ? '<div class="right"><button class="btn btn-sm" data-act="openFolder">Ouvrir le dossier</button></div>' : '') + '</div>'
       : '<div class="banner import"><span>Version navigateur : les données restent dans ce navigateur. Exportez régulièrement une sauvegarde, ou utilisez l’application Android / Windows qui enregistre automatiquement dans un dossier.</span></div>') +
@@ -597,7 +597,7 @@ ACTIONS.setPwd = (code) => openModal({
   onSubmit: (v) => {
     const m = getMember(code); const old = m.portal_password; m.portal_password = v.pwd; saveDB(); toast('Mot de passe enregistré.', 'ok'); render();
     // Même changement sur le compte en ligne du membre
-    if (m.uid && old && v.pwd && old !== v.pwd && typeof changeOnlinePassword === 'function') changeOnlinePassword(code, old, v.pwd).then((ok) => { if (!ok && ONLINE.who) toast('Compte en ligne non mis à jour : cliquez « Créer / mettre à jour les comptes » (Paramètres > En ligne).', 'warn'); });
+    if (old !== v.pwd && typeof memberPasswordChanged === 'function') memberPasswordChanged(code, old, v.pwd);
   },
 });
 ACTIONS.defaultPwds = () => {

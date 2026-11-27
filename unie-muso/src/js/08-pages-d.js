@@ -208,7 +208,13 @@ PAGES.plancomptable = function () {
 /* ---------- Messages et suggestions ----------
    Un membre écrit au comité ; les membres du comité voient le message, répondent ; on voit qui a écrit et qui a répondu. */
 function nowISO() { return new Date().toISOString(); }
-function fmtDT(iso) { return iso ? fmtD(iso.slice(0, 10)) + ' ' + iso.slice(11, 16) : ''; }
+// Date + heure en heure LOCALE (les dates sont enregistrées en UTC : sans conversion, 5 h d'avance en Haïti)
+function fmtDT(iso) {
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return fmtD(String(iso).slice(0, 10)) + ' ' + String(iso).slice(11, 16);
+  const loc = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+  return fmtD(loc.slice(0, 10)) + ' ' + loc.slice(11, 16);
+}
 function whoName(code, fallback) { return code ? (getMember(code) ? memberName(getMember(code)) : code) : (fallback || ''); }
 function myAuthor() { const c = mySelfCode(); return { code: c || '', name: c ? nameOf(c) : currentName() }; }
 function messageThread(msg, canReply) {

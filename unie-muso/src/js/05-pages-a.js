@@ -205,6 +205,7 @@ function openMemberEdit(code) {
       const code2 = (d.code || '').trim().toUpperCase();
       if (!m && getMember(code2)) { toast('Ce code existe déjà.', 'err'); return false; }
       const target = m || Object.assign(clone(seedMember(code2, '', '')), { portal_password: '' });
+      const oldPwd = target.portal_password;
       Object.assign(target, {
         nom: d.nom.trim().toUpperCase(), prenom: d.prenom.trim(), statut: d.statut, telephone: d.telephone.trim(), email: d.email.trim(),
         adresse: d.adresse.trim(), nif: d.nif.trim(), date_adhesion: fmtD(d.date_adhesion), date_naissance: fmtD(d.date_naissance),
@@ -213,6 +214,7 @@ function openMemberEdit(code) {
       if (!m) DB.members.push(target);
       if (saveDB()) toast('Fiche enregistrée.', 'ok');
       DB.prets.forEach((p) => { if (p.code_membre === target.code) p.nom_membre = memberName(target); });
+      if (m && oldPwd !== target.portal_password && typeof memberPasswordChanged === 'function') memberPasswordChanged(target.code, oldPwd, target.portal_password);
       render();
     },
   });

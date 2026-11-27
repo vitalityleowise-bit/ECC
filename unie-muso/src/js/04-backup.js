@@ -99,7 +99,7 @@ function applyBackup(objOrParsed, opts) {
 }
 function describeBackup(p) {
   return p.data.members.length + ' membres, ' + (p.data.cotisations || []).length + ' cotisations, ' + (p.data.prets || []).length + ' prêts' +
-    (p.exported_at ? ' — exportée le ' + fmtD(p.exported_at.slice(0, 10)) + ' à ' + p.exported_at.slice(11, 16) : '');
+    (p.exported_at ? ' — exportée le ' + fmtDT(p.exported_at).replace(' ', ' à ') : '');
 }
 /* Point d'entrée commun : fichier choisi, fichier ouvert depuis WhatsApp, lien ?import= */
 function importBackupText(text, source) {
@@ -116,7 +116,7 @@ function importBackupText(text, source) {
     openModal({
       title: 'Sauvegarde plus ancienne',
       body: '<p style="margin-top:0">Le fichier reçu' + (source ? ' (' + esc(source) + ')' : '') + ' est <b>plus ancien</b> que les données de cet appareil.</p>' +
-        '<p>Fichier : ' + esc(describeBackup(p)) + '<br>Cet appareil : modifié le ' + esc(fmtD(local.slice(0, 10))) + ' à ' + esc(local.slice(11, 16)) + '</p>' +
+        '<p>Fichier : ' + esc(describeBackup(p)) + '<br>Cet appareil : modifié le ' + esc(fmtDT(local).replace(' ', ' à ')) + '</p>' +
         '<p class="muted">Importer remplacera les données de cet appareil.</p>',
       submit: 'Importer quand même', onSubmit: doIt,
     });

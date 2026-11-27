@@ -71,7 +71,10 @@ function sessionCredentials() {
 function errText(e) {
   const c = (e && e.code) || '';
   if (/permission-denied/.test(c)) return 'Accès refusé par le serveur (règles de sécurité non installées, ou compte en ligne pas encore créé par le trésorier).';
-  if (/invalid-credential|wrong-password|invalid-login|user-not-found/.test(c)) return 'Compte en ligne introuvable ou mot de passe différent : le trésorier doit créer ou mettre à jour les comptes en ligne (Paramètres > En ligne).';
+  if (/invalid-credential|wrong-password|invalid-login|user-not-found/.test(c)) {
+    if (SESSION && SESSION.type === 'member') return 'Mot de passe refusé en ligne. Si le trésorier a changé votre mot de passe : touchez « Déconnexion », puis entrez le NOUVEAU mot de passe. Sinon, le trésorier doit cliquer « Créer / mettre à jour les comptes » (Paramètres > En ligne).';
+    return 'Compte en ligne introuvable ou mot de passe différent : le trésorier doit créer ou mettre à jour les comptes en ligne (Paramètres > En ligne).';
+  }
   if (/network|unavailable|deadline/.test(c)) return 'Connexion Internet instable : nouvel essai automatique dans 20 secondes (' + c + ').';
   return ((e && e.message) || String(e)) + (c ? ' (' + c + ')' : '');
 }
@@ -102,6 +105,7 @@ async function goOnline() {
     await pushAll();
     ONLINE.lastSync = Date.now();
     setOnlineStatus('ok', 'En ligne : tout est synchronisé.');
+    touchSeen(true);
   } catch (e) {
     setOnlineStatus('err', errText(e));
     ONLINE.retry = setTimeout(goOnline, 20000);
@@ -114,6 +118,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { ONLINE.hiddenAt = Date.now(); return; }
   if (!SESSION) return;
   if (ONLINE.status === 'err') { goOnline(); return; }
+  touchSeen(false);
   // Après un passage en arrière-plan (téléphone en veille, autre appli), Android ralentit la connexion :
   // on la rouvre tout de suite pour recevoir annonces et messages sans attendre
   if (ONLINE.who && ONLINE.fs && ONLINE.hiddenAt && Date.now() - ONLINE.hiddenAt > 20000) {
@@ -313,6 +318,14 @@ function startListeners() {
     if (p && p.lang && m && m.lang !== p.lang) { m.lang = p.lang; store.set(KEYS.db, DB); afterRemoteChange(); }
   }, () => {}));
 }
+/* Dernière connexion (vue par le trésorier) : au plus une écriture toutes les 10 minutes */
+function touchSeen(force) {
+  const me = mySelfCode(); if (!ONLINE.who || !me || (SESSION.type === 'user' && SESSION.id === 'admin')) return;
+  if (!force && ONLINE.seenAt && Date.now() - ONLINE.seenAt < 600000) return;
+  ONLINE.seenAt = Date.now();
+  const plat = (typeof nativePlatform === 'function' && nativePlatform()) || (/iPhone|iPad/.test(navigator.userAgent) ? 'iphone' : /Android/.test(navigator.userAgent) ? 'android' : 'navigateur');
+  ONLINE.fs.collection('prefs').doc(me).set({ last_seen: Date.now(), app: plat }, { merge: true }).catch(() => {});
+}
 function pushPref(lang) {
   const me = mySelfCode(); if (!ONLINE.who || !me) return;
   ONLINE.fs.collection('prefs').doc(me).set({ lang }, { merge: true }).catch(() => {});
@@ -326,8 +339,7 @@ function onlineRoleFor(m) {
 /* Crée ou met à jour le compte en ligne de chaque membre actif, et son rôle */
 async function syncMemberAccounts(onProgress) {
   if (!isAdmin() || !ONLINE.who) throw new Error('Connectez-vous en ligne avec le compte admin.');
-  const sec = firebase.apps.find((a) => a.name === 'comptes') || firebase.initializeApp(Object.assign({}, FB_CONF, window.UNIE_EMULATOR ? { projectId: window.UNIE_EMULATOR.projectId } : {}), 'comptes');
-  const auth2 = sec.auth(); if (window.UNIE_EMULATOR && !auth2._unieEmu) { auth2.useEmulator(window.UNIE_EMULATOR.auth); auth2._unieEmu = true; }
+  const auth2 = secondaryAuth();
   await auth2.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(() => {});
   const res = { crees: 0, maj: 0, erreurs: [] };
   const list = DB.members.slice().sort(sortByCode);
@@ -341,14 +353,15 @@ async function syncMemberAccounts(onProgress) {
       let uid = m.uid;
       try {
         const c = await auth2.createUserWithEmailAndPassword(fbEmail(m.code), fbPwd(m.portal_password)); uid = c.user.uid; res.crees++;
+        rememberOnlinePwd(m.code, m.portal_password);
       } catch (e) {
         if (!/email-already-in-use/.test(e.code || '')) throw e;
-        const c = await auth2.signInWithEmailAndPassword(fbEmail(m.code), fbPwd(m.portal_password)); uid = c.user.uid; res.maj++;
+        const c = await signInMemberAccount(auth2, m); uid = c.user.uid; res.maj++;
       }
       await auth2.signOut().catch(() => {});
       await ONLINE.fs.collection('roles').doc(uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) });
       m.uid = uid;
-    } catch (e) { res.erreurs.push(m.code + ' : ' + errText(e)); }
+    } catch (e) { await auth2.signOut().catch(() => {}); res.erreurs.push(e.code === 'unie/old-password-unknown' ? e.message : m.code + ' : ' + errText(e)); }
   }
   saveDB(); schedulePush();
   return res;
@@ -362,15 +375,49 @@ async function syncRolesOnly() {
     else await ONLINE.fs.collection('roles').doc(m.uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) }).catch(() => {});
   }
 }
-/* Changement du mot de passe d'un membre : aussi sur son compte en ligne */
-async function changeOnlinePassword(code, oldPwd, newPwd) {
-  if (!ONLINE.who || !isAdmin()) return false;
-  const sec = firebase.apps.find((a) => a.name === 'comptes') || firebase.initializeApp(FB_CONF, 'comptes');
-  const auth2 = sec.auth();
-  try {
-    const c = await auth2.signInWithEmailAndPassword(fbEmail(code), fbPwd(oldPwd));
-    await c.user.updatePassword(fbPwd(newPwd)); await auth2.signOut(); return true;
-  } catch (_e) { await auth2.signOut().catch(() => {}); return false; }
+/* ---------- Mots de passe des comptes en ligne ----------
+   Firebase ne laisse changer un mot de passe qu'en donnant l'ANCIEN. L'appareil du trésorier garde donc
+   (ici seulement, jamais envoyé) le mot de passe actuellement posé sur chaque compte en ligne,
+   et les anciens mots de passe, pour pouvoir les remplacer plus tard. */
+function pwdMemory() { const st = syncState(); st.pwds = st.pwds || {}; st.oldPwds = st.oldPwds || {}; return st; }
+function rememberOnlinePwd(code, pwd) { const st = pwdMemory(); st.pwds[code] = pwd; saveSyncState(); }
+function rememberOldPwd(code, pwd) {
+  if (!pwd) return; const st = pwdMemory(); const l = st.oldPwds[code] = st.oldPwds[code] || [];
+  if (!l.includes(pwd)) l.push(pwd); if (l.length > 8) l.shift(); saveSyncState();
+}
+function secondaryAuth() {
+  const sec = firebase.apps.find((a) => a.name === 'comptes') || firebase.initializeApp(Object.assign({}, FB_CONF, window.UNIE_EMULATOR ? { projectId: window.UNIE_EMULATOR.projectId } : {}), 'comptes');
+  const auth2 = sec.auth(); if (window.UNIE_EMULATOR && !auth2._unieEmu) { auth2.useEmulator(window.UNIE_EMULATOR.auth); auth2._unieEmu = true; }
+  return auth2;
+}
+/* Connexion au compte en ligne d'un membre : nouveau mot de passe, sinon un ancien (puis remplacé) */
+async function signInMemberAccount(auth2, m) {
+  const st = pwdMemory(); const newPwd = m.portal_password;
+  try { const c = await auth2.signInWithEmailAndPassword(fbEmail(m.code), fbPwd(newPwd)); rememberOnlinePwd(m.code, newPwd); return c; } catch (e) {
+    if (!/invalid-credential|wrong-password|invalid-login/.test(e.code || '')) throw e;
+  }
+  const tries = [st.pwds[m.code]].concat((st.oldPwds[m.code] || []).slice().reverse(), [m.code.toLowerCase(), m.code]).filter((p, i, a) => p && p !== newPwd && a.indexOf(p) === i);
+  for (const p of tries) {
+    let c; try { c = await auth2.signInWithEmailAndPassword(fbEmail(m.code), fbPwd(p)); } catch (e) { if (/too-many-requests/.test(e.code || '')) throw e; continue; }
+    await c.user.updatePassword(fbPwd(newPwd)); rememberOnlinePwd(m.code, newPwd); return c;
+  }
+  const err = new Error(m.code + ' : l’ancien mot de passe en ligne est inconnu. Console Firebase > Authentication > Utilisateurs : supprimez « ' + fbEmail(m.code) + ' », puis cliquez à nouveau « Créer / mettre à jour les comptes ».');
+  err.code = 'unie/old-password-unknown'; throw err;
+}
+/* Mot de passe d'un membre modifié (fiche membre ou onglet portail) : aussi sur son compte en ligne */
+function memberPasswordChanged(code, oldPwd, newPwd) {
+  if (!isAdmin()) return;
+  rememberOldPwd(code, oldPwd);
+  const m = getMember(code); if (!m || !m.uid || !newPwd) return;
+  if (!ONLINE.who) { toast('Mot de passe enregistré. Le compte en ligne sera mis à jour au prochain « Créer / mettre à jour les comptes » (Paramètres > En ligne).', 'warn'); return; }
+  const auth2 = secondaryAuth();
+  signInMemberAccount(auth2, m).then(() => auth2.signOut().catch(() => {}))
+    .then(() => toast('Compte en ligne de ' + code + ' mis à jour.', 'ok'))
+    .catch((e) => {
+      auth2.signOut().catch(() => {});
+      if (/network|unavailable/.test(e.code || '')) toast('Mot de passe enregistré. Pas d’Internet : le compte en ligne de ' + code + ' sera mis à jour au prochain « Créer / mettre à jour les comptes » (Paramètres > En ligne).', 'warn');
+      else toast(e.code === 'unie/old-password-unknown' ? e.message : 'Compte en ligne de ' + code + ' non mis à jour : ' + errText(e), 'err');
+    });
 }
 
 /* ---------- Connexion sur un appareil sans données (lien en ligne, iPhone) ---------- */
@@ -407,10 +454,26 @@ function onlineSettingsHTML() {
     (ONLINE.detail && ONLINE.status === 'err' ? '<div class="banner import" style="margin:12px 0 0"><span>' + esc(ONLINE.detail) + '</span></div>' : '') +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' +
       '<button class="btn btn-primary" data-act="onlineNow">Synchroniser maintenant</button>' +
-      '<button class="btn btn-accent" data-act="onlineAccounts">Créer / mettre à jour les comptes des membres</button></div>' +
+      '<button class="btn btn-accent" data-act="onlineAccounts">Créer / mettre à jour les comptes des membres</button>' +
+      '<button class="btn" data-act="onlineSeen">Dernière connexion des membres</button></div>' +
     '<div class="muted" style="margin-top:12px;font-size:12px">Chaque membre se connecte avec son code (ex. M004) et le mot de passe du portail. Après avoir changé un mot de passe, un poste au comité ou la personne autorisée à modifier, cliquez « Créer / mettre à jour les comptes ».</div>' +
     '</div></section>';
 }
+ACTIONS.onlineSeen = () => {
+  if (!ONLINE.who) { toast('Connectez-vous d’abord en ligne (Internet + compte admin).', 'err'); return; }
+  ONLINE.fs.collection('prefs').get().then((snap) => {
+    const seen = {}; snap.forEach((d) => { seen[d.id] = d.data(); });
+    const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'à l’instant' : m < 60 ? 'il y a ' + m + ' min' : m < 1440 ? 'il y a ' + Math.round(m / 60) + ' h' : 'il y a ' + Math.round(m / 1440) + ' jour(s)'; };
+    const app = { android: 'Téléphone Android', windows: 'PC Windows', iphone: 'iPhone', navigateur: 'Navigateur' };
+    const list = DB.members.filter((m) => m.statut !== 'Inactif').map((m) => ({ m, s: seen[m.code] && seen[m.code].last_seen ? seen[m.code] : null }))
+      .sort((a, b) => ((b.s && b.s.last_seen) || 0) - ((a.s && a.s.last_seen) || 0) || sortByCode(a.m, b.m));
+    const n24 = list.filter((x) => x.s && Date.now() - x.s.last_seen < 86400000).length; const never = list.filter((x) => !x.s).length;
+    openModal({ title: 'Dernière connexion des membres', wide: true, submit: null,
+      body: '<div class="muted" style="margin-bottom:10px">' + n24 + ' membre(s) connecté(s) ces dernières 24 h · ' + never + ' jamais connecté(s) en ligne. Mis à jour à chaque ouverture de l’application avec Internet.</div>' +
+        table(['Code', 'Membre', 'Dernière connexion', 'Appareil'], list.map((x) => '<tr><td class="code">' + x.m.code + '</td><td>' + esc(memberName(x.m)) + '</td><td>' +
+          (x.s ? esc(fmtDT(new Date(x.s.last_seen).toISOString())) + ' <span class="muted">(' + ago(x.s.last_seen) + ')</span>' : '<span class="badge b-grey">jamais</span>') + '</td><td>' + (x.s ? esc(app[x.s.app] || x.s.app || '') : '') + '</td></tr>')) });
+  }).catch((e) => toast(errText(e), 'err'));
+};
 ACTIONS.onlineNow = () => { goOnline().then(() => render()); };
 ACTIONS.onlineAccounts = () => {
   if (!ONLINE.who) { toast('Connectez-vous d’abord en ligne (Internet + compte admin).', 'err'); goOnline(); return; }
