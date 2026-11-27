@@ -209,7 +209,12 @@ ACTIONS.depRecu = (i) => openModal({ title: 'Reçu — ' + (DB.depenses[+i].piec
 
 /* ---------- Statistiques ---------- */
 PAGES.stats = function () {
-  const ms = monthlyStats().filter((m) => m.key >= monthKey(RULES.mutuelle_start));
+  // Depuis le début de la mutuelle, ou plus tôt si des opérations ont été faites avant
+  // (ex. dépenses de démarrage du 27/03/2026) : sinon les totaux ne correspondent plus aux états financiers
+  const all = monthlyStats();
+  const firstOp = all.find((m) => m.verte + m.rouge + m.amendes + m.depenses + m.prets + m.remb > 0);
+  const fromKey = firstOp && firstOp.key < monthKey(RULES.mutuelle_start) ? firstOp.key : monthKey(RULES.mutuelle_start);
+  const ms = all.filter((m) => m.key >= fromKey);
   const labels = ms.map((m) => monthLabel(m.key, true));
   const withCot = ms.filter((m) => m.verte + m.rouge > 0);
   const best = withCot.slice().sort((a, b) => (b.verte + b.rouge) - (a.verte + a.rouge))[0];
@@ -222,7 +227,7 @@ PAGES.stats = function () {
     ['verte', 'rouge', 'amendes', 'depenses', 'prets', 'remb'].forEach((k) => { o[k] += m[k]; });
   });
   const qk = Object.keys(quarters);
-  return pageHead('Gestion', t('stats'), 'Depuis le ' + fmtD(RULES.mutuelle_start)) +
+  return pageHead('Gestion', t('stats'), fromKey < monthKey(RULES.mutuelle_start) ? 'Depuis ' + monthLabel(fromKey).toLowerCase() + ' (opérations de démarrage avant le ' + fmtD(RULES.mutuelle_start) + ' comprises)' : 'Depuis le ' + fmtD(RULES.mutuelle_start)) +
     '<div class="kpis">' + kpi('Cotisations', fmt(sum(ms, (m) => m.verte + m.rouge)) + ' <small>HTG</small>', DB.cotisations.length + ' versements', 'navy') +
       kpi('Amendes', fmt(sum(ms, (m) => m.amendes)) + ' <small>HTG</small>', DB.amendes_paid.length + ' amendes', 'orange') +
       kpi('Dépenses', fmt(sum(ms, (m) => m.depenses)) + ' <small>HTG</small>', DB.depenses.length + ' pièce(s)', 'red') +
