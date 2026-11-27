@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.6.4 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.7.1 (APK et Windows) = contenu de la 3.6.4 — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -110,6 +110,11 @@ POINTS TECHNIQUES IMPORTANTS
   demandes (pushCollab) puis les grandes listes (pushShared) ; un envoi demandé pendant un
   autre n'est plus perdu (ONLINE.pushAgain). Au retour au premier plan après plus de 20 s,
   la connexion Firestore est rouverte (disableNetwork puis enableNetwork).
+- 3.7.0 (service Android de notifications application fermée, sans carte) a été RETIRÉE
+  à la demande du trésorier : la 3.7.1 reprend exactement la 3.6.4 (numéro plus haut pour
+  que les téléphones l'acceptent en mise à jour). Le code de la 3.7.0 reste dans l'historique
+  Git (commit « notifications with the app closed… »). Le trésorier cherche une carte pour
+  la formule Blaze (notifications instantanées par Firebase Cloud Messaging).
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer
