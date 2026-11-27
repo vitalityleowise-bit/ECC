@@ -1,0 +1,48 @@
+name: vitality_cours
+description: VITALITY COURS - AI language tutor (English, Spanish, French).
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (choose one approach and keep it)
+  flutter_riverpod: ^2.5.1
+
+  # Routing
+  go_router: ^14.2.0
+
+  # Voice capture and playback
+  record: ^5.1.0
+  just_audio: ^0.9.40
+
+  # Networking and streaming to our own backend
+  dio: ^5.5.0
+  flutter_client_sse: ^2.0.2
+
+  # Local storage
+  shared_preferences: ^2.3.0
+  path_provider: ^2.1.4
+  permission_handler: ^11.3.1
+
+  # i18n
+  easy_localization: ^3.0.7
+
+  # UI helpers
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/personas/personas.json
+    - assets/translations/

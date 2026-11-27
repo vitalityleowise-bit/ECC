@@ -1,0 +1,43 @@
+# Curated ECC skills for a sales + accounting system (POS, invoices, stock, ledger).
+# One skill folder name per line. Lines starting with # are ignored.
+
+# Planning (turn an idea into a step-by-step build plan)
+blueprint
+product-capability
+orch-build-mvp
+search-first
+
+# Quality and safety (always on)
+tdd-workflow
+verification-loop
+coding-standards
+security-review
+error-handling
+production-audit
+
+# Database (money, ledger, stock must never be lost)
+postgres-patterns
+database-migrations
+prisma-patterns
+
+# Backend and API
+backend-patterns
+api-design
+
+# Screens the user sees
+frontend-patterns
+react-patterns
+typescript-patterns
+design-system
+accessibility
+e2e-testing
+
+# Business features
+inventory-demand-planning
+finance-billing-ops
+i18n-sync
+
+# Shipping and long sessions
+deployment-patterns
+git-workflow
+strategic-compact

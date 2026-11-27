@@ -1,0 +1,12 @@
+{
+  "name": "vitality-cours-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VITALITY COURS backend - holds API keys, routes AI, streams voice.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/run.js"
+  },
+  "engines": { "node": ">=18" }
+}

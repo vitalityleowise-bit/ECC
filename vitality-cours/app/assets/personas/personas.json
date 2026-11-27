@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "note": "Conversation styles for VITALITY COURS. Each persona is data, not code, so new styles can be added without changing the app. The tutor's hidden instruction is built from these fields on the backend.",
+  "targetLanguages": ["en", "es", "fr"],
+  "levels": [
+    { "id": "beginner", "label": { "en": "Beginner", "es": "Principiante", "fr": "Débutant", "ht": "Debutan" }, "speakingRate": 0.8, "correctionStrictness": "gentle", "sentenceMaxWords": 10 },
+    { "id": "intermediate", "label": { "en": "Intermediate", "es": "Intermedio", "fr": "Intermédiaire", "ht": "Mwayen" }, "speakingRate": 0.95, "correctionStrictness": "balanced", "sentenceMaxWords": 18 },
+    { "id": "professional", "label": { "en": "Professional", "es": "Profesional", "fr": "Professionnel", "ht": "Pwofesyonèl" }, "speakingRate": 1.0, "correctionStrictness": "strict", "sentenceMaxWords": 30 }
+  ],
+  "styles": [
+    {
+      "id": "everyday",
+      "icon": "chat",
+      "label": { "en": "Everyday talk", "es": "Conversación diaria", "fr": "Conversation du quotidien", "ht": "Pale toulejou" },
+      "description": { "en": "Casual daily conversation.", "es": "Conversación cotidiana.", "fr": "Conversation de tous les jours.", "ht": "Konvèsasyon de baz." },
+      "goal": "Help the learner hold a natural everyday conversation.",
+      "topics": ["greetings", "family", "weekend", "weather", "hobbies"]
+    },
+    {
+      "id": "travel",
+      "icon": "flight",
+      "label": { "en": "Travel", "es": "Viajes", "fr": "Voyage", "ht": "Vwayaj" },
+      "description": { "en": "Airport, hotel, directions.", "es": "Aeropuerto, hotel, direcciones.", "fr": "Aéroport, hôtel, directions.", "ht": "Ayewopò, otèl, direksyon." },
+      "goal": "Prepare the learner to handle travel situations.",
+      "topics": ["airport", "hotel checkin", "asking directions", "taxi", "emergencies"]
+    },
+    {
+      "id": "restaurant",
+      "icon": "restaurant",
+      "label": { "en": "Restaurant", "es": "Restaurante", "fr": "Restaurant", "ht": "Restoran" },
+      "description": { "en": "Order food and drinks.", "es": "Pedir comida y bebida.", "fr": "Commander à manger et à boire.", "ht": "Kòmande manje ak bwason." },
+      "goal": "Let the learner order and discuss food confidently.",
+      "topics": ["ordering", "allergies", "the bill", "complaints", "recommendations"]
+    },
+    {
+      "id": "shopping",
+      "icon": "shopping_cart",
+      "label": { "en": "Shopping", "es": "Compras", "fr": "Shopping", "ht": "Fè makèt" },
+      "description": { "en": "Prices, sizes, returns.", "es": "Precios, tallas, devoluciones.", "fr": "Prix, tailles, retours.", "ht": "Pri, gwosè, retou." },
+      "goal": "Practice buying things and negotiating politely.",
+      "topics": ["prices", "sizes", "payment", "returns", "bargaining"]
+    },
+    {
+      "id": "business",
+      "icon": "business_center",
+      "label": { "en": "Business", "es": "Negocios", "fr": "Affaires", "ht": "Biznis" },
+      "description": { "en": "Meetings, emails, negotiation.", "es": "Reuniones, correos, negociación.", "fr": "Réunions, e-mails, négociation.", "ht": "Reyinyon, imèl, negosyasyon." },
+      "goal": "Build professional communication skills.",
+      "topics": ["introductions", "meetings", "presentations", "negotiation", "small talk"]
+    },
+    {
+      "id": "interview",
+      "icon": "work",
+      "label": { "en": "Job interview", "es": "Entrevista de trabajo", "fr": "Entretien d'embauche", "ht": "Antrevi travay" },
+      "description": { "en": "Practice answering interview questions.", "es": "Practica respuestas de entrevista.", "fr": "S'entraîner aux questions d'entretien.", "ht": "Pratike reponn kesyon antrevi." },
+      "goal": "Prepare the learner for a job interview, acting as the interviewer.",
+      "topics": ["tell me about yourself", "strengths and weaknesses", "experience", "salary", "questions for us"]
+    }
+  ]
+}
