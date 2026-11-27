@@ -72,8 +72,8 @@ function errText(e) {
   const c = (e && e.code) || '';
   if (/permission-denied/.test(c)) return 'Accès refusé par le serveur (règles de sécurité non installées, ou compte en ligne pas encore créé par le trésorier).';
   if (/invalid-credential|wrong-password|invalid-login|user-not-found/.test(c)) return 'Compte en ligne introuvable ou mot de passe différent : le trésorier doit créer ou mettre à jour les comptes en ligne (Paramètres > En ligne).';
-  if (/network|unavailable/.test(c)) return 'Connexion Internet instable : nouvel essai automatique.';
-  return (e && e.message) || String(e);
+  if (/network|unavailable|deadline/.test(c)) return 'Connexion Internet instable : nouvel essai automatique dans 20 secondes (' + c + ').';
+  return ((e && e.message) || String(e)) + (c ? ' (' + c + ')' : '');
 }
 async function goOnline() {
   clearTimeout(ONLINE.retry);
@@ -104,11 +104,13 @@ async function goOnline() {
     setOnlineStatus('ok', 'En ligne : tout est synchronisé.');
   } catch (e) {
     setOnlineStatus('err', errText(e));
-    ONLINE.retry = setTimeout(goOnline, 60000);
+    ONLINE.retry = setTimeout(goOnline, 20000);
   }
 }
 function goOffline() { stopListeners(); ONLINE.who = ''; if (ONLINE.auth) ONLINE.auth.signOut().catch(() => {}); setOnlineStatus('off'); }
 window.addEventListener('online', () => { if (SESSION) goOnline(); });
+// Retour dans l'application (téléphone sorti de veille, autre appli fermée) : nouvel essai immédiat
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && SESSION && ONLINE.status === 'err') goOnline(); });
 window.addEventListener('offline', () => setOnlineStatus('off', 'Hors ligne : vos changements sont gardés et seront envoyés au retour d’Internet.'));
 
 /* ---------- Envoi (local → serveur) ---------- */

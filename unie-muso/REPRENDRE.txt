@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.6.0 (27/11/2026). Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.6.1 (APK) / 3.6.0 (Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -96,6 +96,9 @@ POINTS TECHNIQUES IMPORTANTS
 - Depuis la 3.6 : l'APK sert la page sur https://appassets.androidplatform.net/assets/
   et Windows sur app://unie-muso/ (adresses sécurisées exigées par Firebase).
   Au premier lancement de la 3.6, les données reviennent du dossier Documents/UNIE-MUSO.
+- APK 3.6.1 : ajout de la permission INTERNET (absente avant : le téléphone affichait
+  « Connexion Internet instable »). Nouvel essai en ligne toutes les 20 s et au retour
+  dans l'application ; le code d'erreur Firebase est affiché dans le message.
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer
