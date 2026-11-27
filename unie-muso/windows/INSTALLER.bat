@@ -29,7 +29,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
 rem Ligne « Desinstaller » dans Parametres > Applications
 set "UK=HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\UNIE-MUSO"
 reg add "%UK%" /v DisplayName /d "UNIE-MUSO" /f >nul
-reg add "%UK%" /v DisplayVersion /d "3.6.0" /f >nul
+reg add "%UK%" /v DisplayVersion /d "3.6.2" /f >nul
 reg add "%UK%" /v Publisher /d "UNIE-MUSO" /f >nul
 reg add "%UK%" /v DisplayIcon /d "%DEST%\UNIE-MUSO.exe" /f >nul
 reg add "%UK%" /v UninstallString /d "\"%DEST%\DESINSTALLER.bat\"" /f >nul

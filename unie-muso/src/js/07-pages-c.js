@@ -43,7 +43,7 @@ PAGES.balance = function () {
   const B = balances(buildJournal(), p.from, p.to);
   const accs = Object.keys(B).map(Number).sort((a, b) => a - b);
   let t1 = 0, t2 = 0, t3 = 0, t4 = 0;
-  // Comptes classés par classe (1 Actif → 5 Charges), avec un sous-total par classe
+  // Comptes classés par classe, sans sous-total (format de la feuille BALANCE_VERIFICATION) : totaux en bas seulement
   const rows = [];
   CLASS_ORDER.forEach((cl) => {
     // Tous les comptes du plan sont listés, même à zéro (comme la feuille BALANCE_VERIFICATION)
@@ -58,7 +58,6 @@ PAGES.balance = function () {
       rows.push('<tr><td class="code">' + a + '</td><td>' + esc(accLabel(a)) + '</td><td class="n">' + fmt(b.pd) + '</td><td class="n">' + fmt(b.pc) + '</td><td class="n">' + (s > 0 ? fmt(s) : '') + '</td><td class="n">' + (s < 0 ? fmt(-s) : '') + '</td></tr>');
     });
     t1 += c1; t2 += c2; t3 += c3; t4 += c4;
-    rows.push('<tr><td></td><td class="muted"><i>Sous-total classe ' + cl + '</i></td><td class="n muted">' + fmt(c1) + '</td><td class="n muted">' + fmt(c2) + '</td><td class="n muted">' + (c3 ? fmt(c3) : '') + '</td><td class="n muted">' + (c4 ? fmt(c4) : '') + '</td></tr>');
   });
   return pageHead('Comptabilité', 'Balance de vérification', 'Mouvements de la période et soldes cumulés · ' + esc(periodText()), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
     '<section class="panel">' + periodBar() + table(['Compte', 'Intitulé', ['Débit période', 'n'], ['Crédit période', 'n'], ['Solde débiteur cumulé', 'n'], ['Solde créditeur cumulé', 'n']], rows,
