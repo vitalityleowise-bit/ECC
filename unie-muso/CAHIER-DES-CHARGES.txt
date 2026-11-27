@@ -142,3 +142,9 @@ L. NOTIFICATIONS (27/11/2026) — FAIT en version 3.6.3
    - Fonctionne quand l'application est ouverte ou en arrière-plan. Sur PC, UNIE-MUSO reste
      actif près de l'horloge. Application complètement fermée sur le téléphone : pas de
      notification (demanderait Firebase Cloud Messaging + Cloud Functions, formule Blaze).
+
+M. NOTIFICATIONS APPLICATION FERMÉE (27/11/2026) — FAIT en version 3.7.0
+   - Sans carte bancaire : le téléphone vérifie toutes les 90 secondes (10 minutes la nuit)
+     s'il y a une annonce, un message, une réponse ou une décision de prêt.
+   - Une petite icône « UNIE-MUSO actif » reste dans la barre de notifications (obligatoire sur Android).
+   - Nécessite de publier une fois les nouvelles règles Firestore (REGLES-FIRESTORE.txt).

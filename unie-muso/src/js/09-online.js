@@ -102,6 +102,7 @@ async function goOnline() {
     await pushAll();
     ONLINE.lastSync = Date.now();
     setOnlineStatus('ok', 'En ligne : tout est synchronisé.');
+    startNativePush(cred);
   } catch (e) {
     setOnlineStatus('err', errText(e));
     ONLINE.retry = setTimeout(goOnline, 20000);
@@ -169,6 +170,65 @@ function recKey(arr, item) {
   if (arr === 'demandes_pret') { if (!item.key) item.key = 'd' + item.id + '-' + item.code_membre; return item.key; }
   return item.id;
 }
+/* ---------- Boîtes de notification ----------
+   notifs/{boîte} = { last } + notifs/{boîte}/ev/{id} = { at, t, b, by, eid }.
+   Boîtes : code d'un membre (M007…), « comite » (tout le comité), « admin » (trésorier).
+   Le service Android lit seulement « last » de ses boîtes (~90 s), puis les nouveaux événements. */
+function evState(arr, it) {
+  if (arr === 'messages') return { r: (it.replies || []).length };
+  if (arr === 'suggestions') return { rep: !!it.reponse };
+  if (arr === 'demandes_pret') return { s: it.statut };
+  return {};
+}
+function annonceBoxes() {
+  const me = mySelfCode(); const admin = SESSION && SESSION.type === 'user' && SESSION.id === 'admin';
+  const boxes = DB.members.filter((m) => m.statut !== 'Inactif' && m.code !== me).map((m) => m.code);
+  if (!admin) boxes.push('admin');
+  return boxes;
+}
+function collabEvents(arr, it, prev, isNew) {
+  const me = mySelfCode(); const out = [];
+  if (arr === 'annonces' && isNew) out.push([annonceBoxes(), 'Annonce du comité', (it.titre ? it.titre + ' : ' : '') + shortTxt(it.texte)]);
+  if (arr === 'messages') {
+    if (isNew && it.from_code === me) out.push([['comite'], 'Message de ' + (it.from_name || it.from_code), (it.sujet ? it.sujet + ' : ' : '') + shortTxt(it.texte)]);
+    const r = it.replies || [];
+    if (prev && r.length > prev.r && it.from_code && it.from_code !== me) { const last = r[r.length - 1]; out.push([[it.from_code], 'Réponse de ' + (last.by_name || 'du comité'), (it.sujet ? it.sujet + ' : ' : '') + shortTxt(last.texte)]); }
+  }
+  if (arr === 'suggestions') {
+    if (isNew && it.from_code === me) out.push([['comite'], 'Nouvelle suggestion', shortTxt(it.texte)]);
+    if (prev && !prev.rep && it.reponse && it.from_code && it.from_code !== me) out.push([[it.from_code], 'Réponse à votre suggestion', shortTxt(it.reponse)]);
+  }
+  if (arr === 'demandes_pret') {
+    if (isNew) out.push([['comite'], 'Nouvelle demande de prêt', (it.nom_membre || nameOf(it.code_membre)) + (it.montant_demande ? ' : ' + money(it.montant_demande) : '')]);
+    if (prev && prev.s !== it.statut && it.statut !== 'En attente' && it.code_membre !== me) out.push([[it.code_membre], 'Votre demande de prêt', it.statut + (it.statut === 'Approuvée' && it.montant_approuve ? ' : ' + money(it.montant_approuve) : '')]);
+  }
+  return out.map((e) => [e[0].filter(Boolean), e[1], e[2]]).filter((e) => e[0].length);
+}
+function boxAuthor() { return SESSION && SESSION.type === 'user' && SESSION.id === 'admin' ? 'admin' : (mySelfCode() || ''); }
+async function sendBoxEvent(boxes, title, body) {
+  const fs = ONLINE.fs; const at = Date.now(); const eid = uid(); const batch = fs.batch();
+  boxes.forEach((box) => {
+    batch.set(fs.collection('notifs').doc(box), { last: at }, { merge: true });
+    batch.set(fs.collection('notifs').doc(box).collection('ev').doc(eid), { at, t: 'UNIE-MUSO — ' + title, b: body, by: boxAuthor(), eid });
+  });
+  await batch.commit();
+}
+/* Service Android de notifications (application fermée) */
+function startNativePush(cred) {
+  if (!window.UnieNative || !UnieNative.startPush || !cred) return;
+  const admin = SESSION.type === 'user' && SESSION.id === 'admin';
+  const code = mySelfCode() || ''; const comite = isOnlineComite();
+  const boxes = admin ? ['admin', 'comite'] : comite ? [code, 'comite'] : [code];
+  const E = window.UNIE_EMULATOR;
+  try {
+    UnieNative.startPush(JSON.stringify({
+      apiKey: FB_CONF.apiKey, projectId: E ? E.projectId : FB_CONF.projectId, email: cred.email, pwd: fbPwd(cred.pwd),
+      me: boxAuthor(), boxes: boxes.filter(Boolean),
+      authBase: E ? E.auth + '/identitytoolkit.googleapis.com' : '', fsBase: E ? 'http://' + E.host + ':' + E.port : '',
+    }));
+  } catch (_e) { /* */ }
+}
+function nativePushActive() { try { return !!(window.UnieNative && UnieNative.pushActive && UnieNative.pushActive()); } catch (_e) { return false; } }
 async function pushCollab() {
   const st = syncState(); const fs = ONLINE.fs; const me = mySelfCode(); const comite = isOnlineComite();
   for (const arr of Object.keys(COLLAB)) {
@@ -185,9 +245,16 @@ async function pushCollab() {
         rec[k] = h; continue;
       }
       if (!comite && !mine) { rec[k] = h; continue; }
+      const isNew = rec[k] === undefined;
+      // Boîtes de notification (lues par le téléphone même application fermée). Calculé AVANT l'envoi :
+      // Firestore renvoie aussitôt la nouvelle version à l'écouteur, qui mettrait l'état à jour trop tôt.
+      const evs = st.ev = st.ev || {}; const ev = evs[conf.col] = evs[conf.col] || {};
+      const evts = st.evInit && st.evInit[conf.col] ? collabEvents(arr, item, ev[k], isNew) : [];
       await fs.collection(conf.col).doc(String(k)).set(plain(item));
-      rec[k] = h; saveSyncState();
+      rec[k] = h; ev[k] = evState(arr, item); saveSyncState();
+      for (const e of evts) await sendBoxEvent(e[0], e[1], e[2]).catch((er) => console.warn('[UNIE-MUSO] notification', er && er.code));
     }
+    st.evInit = st.evInit || {}; st.evInit[conf.col] = true; // 1er passage : l'historique ne déclenche rien
     // Suppressions faites sur cet appareil
     if (isOnlineEditor() || (arr === 'annonces' && comite)) {
       const keys = new Set(list.map((it) => String(recKey(arr, it))));
@@ -243,7 +310,8 @@ function onRemoteCollab(arr, snap, scoped) {
   const remote = {}; snap.forEach((d) => { remote[d.id] = d.data(); });
   const local = DB[arr] || [];
   const out = []; const seen = new Set();
-  Object.keys(remote).forEach((k) => { out.push(remote[k]); seen.add(String(k)); rec[k] = hashStr(JSON.stringify(remote[k])); });
+  st.ev = st.ev || {}; const ev = st.ev[conf.col] = st.ev[conf.col] || {};
+  Object.keys(remote).forEach((k) => { out.push(remote[k]); seen.add(String(k)); rec[k] = hashStr(JSON.stringify(remote[k])); ev[k] = evState(arr, remote[k]); });
   local.forEach((it) => {
     const k = String(recKey(arr, it));
     if (seen.has(k)) return;
@@ -263,6 +331,8 @@ function onRemoteCollab(arr, snap, scoped) {
 function shortTxt(x, n) { x = String(x || '').replace(/\s+/g, ' ').trim(); return x.length > (n || 90) ? x.slice(0, (n || 90) - 1) + '…' : x; }
 function notifyRemoteChanges(arr, before, after) {
   if (!SESSION || SETTINGS.notif_online === false) return;
+  // Sur Android avec le service actif : le service notifie quand l'application n'est pas à l'écran
+  if (nativePushActive() && document.visibilityState !== 'visible') return;
   const me = mySelfCode(); const comite = isOnlineComite();
   const idOf = (it) => String(recKey(arr, it));
   const old = {}; before.forEach((it) => { old[idOf(it)] = it; });

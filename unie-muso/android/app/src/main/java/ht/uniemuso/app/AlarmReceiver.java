@@ -20,6 +20,7 @@ public class AlarmReceiver extends BroadcastReceiver {
     public void onReceive(Context ctx, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             scheduleAll(ctx, ctx.getSharedPreferences("alarmes", Context.MODE_PRIVATE).getString("list", "[]"));
+            PushService.start(ctx);
             return;
         }
         show(ctx, intent.getIntExtra("id", 1), intent.getStringExtra("title"), intent.getStringExtra("body"));

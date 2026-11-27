@@ -34,6 +34,8 @@ public class MainActivity extends Activity {
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
     private boolean pageReady = false;
+    /** Application à l'écran : le service ne notifie pas (la page le fait elle-même). */
+    static volatile boolean visible = false;
     String pendingImport = "";
 
     @Override
@@ -80,6 +82,7 @@ public class MainActivity extends Activity {
             }
         });
         handleIntent(getIntent());
+        PushService.start(this); // déjà configuré : le service reprend (après une mise à jour, par exemple)
         web.loadUrl("https://" + WebViewAssetLoader.DEFAULT_DOMAIN + "/assets/UNIE-MUSO.html");
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
@@ -88,6 +91,9 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 8);
         }
     }
+
+    @Override protected void onResume() { super.onResume(); visible = true; }
+    @Override protected void onPause() { visible = false; super.onPause(); }
 
     @Override
     protected void onNewIntent(Intent intent) {

@@ -51,6 +51,23 @@ service cloud.firestore {
       allow update: if isComite();
       allow delete: if isEditor();
     }
+    // Boîtes de notification (téléphone, même application fermée) :
+    // « M007 » = boîte d'un membre, « comite » = tout le comité, « admin » = trésorier.
+    function canReadBox(box) {
+      return (box == 'comite' && isComite()) || (box == 'admin' && isAdmin()) || (hasRole() && box == myCode());
+    }
+    // Le comité écrit dans toutes les boîtes ; un membre seulement dans celle du comité
+    function canWriteBox(box) { return isComite() || (isMember() && box == 'comite'); }
+    match /notifs/{box} {
+      allow read: if canReadBox(box);
+      allow write: if canWriteBox(box) && request.resource.data.keys().hasOnly(['last']);
+      match /ev/{id} {
+        allow read: if canReadBox(box);
+        allow create: if canWriteBox(box) && request.resource.data.keys().hasOnly(['at', 't', 'b', 'by', 'eid'])
+          && request.resource.data.by == (isAdmin() ? 'admin' : myCode());
+        allow delete: if isEditor();
+      }
+    }
     // Préférences personnelles (langue)
     match /prefs/{code} {
       allow read, write: if isMember() && (isEditor() || code == myCode());

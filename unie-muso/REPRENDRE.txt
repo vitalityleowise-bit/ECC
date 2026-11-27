@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.6.4 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.7.0 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -103,9 +103,15 @@ POINTS TECHNIQUES IMPORTANTS
   (notifyRemoteChanges dans 09-online.js) : annonce -> tous ; message, suggestion,
   demande de prêt -> comité ; réponse, décision de prêt -> le membre concerné.
   Jamais pour ses propres écrits, ni pour l'historique sur un appareil neuf.
-  Limite : l'application doit être ouverte ou en arrière-plan (sur PC elle reste
-  dans la zone de notification). Application fermée sur le téléphone = pas de
-  notification : il faudrait Firebase Cloud Messaging + Cloud Functions (formule Blaze).
+- 3.7.0 : notifications sur le téléphone MÊME APPLICATION FERMÉE, sans carte ni serveur payant.
+  L'appli qui envoie écrit dans des « boîtes » Firestore : notifs/{M007 | comite | admin} = { last }
+  + notifs/{boîte}/ev/{id} = { at, t, b, by, eid } (collabEvents / sendBoxEvent, 09-online.js).
+  Le service Android PushService (premier plan, « UNIE-MUSO actif ») lit seulement « last »
+  de ses boîtes toutes les 90 s (10 min de 22 h à 6 h), puis les nouveaux événements
+  (logique dans PushCore.java, testable sur PC : javac + org.json contre l'émulateur).
+  Quota gratuit Firestore : 50 000 lectures/jour ; 19 téléphones ≈ 13 000/jour.
+  Les règles Firestore doivent contenir le bloc « notifs » (firebase/firestore.rules).
+  Doublons évités : la page notifie quand elle est à l'écran, le service sinon.
 - 3.6.4 : envoi plus rapide depuis le PC. pushAll envoie d'abord messages / annonces /
   demandes (pushCollab) puis les grandes listes (pushShared) ; un envoi demandé pendant un
   autre n'est plus perdu (ONLINE.pushAgain). Au retour au premier plan après plus de 20 s,
