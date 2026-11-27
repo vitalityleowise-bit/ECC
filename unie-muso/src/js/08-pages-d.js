@@ -270,21 +270,21 @@ ACTIONS.annNew = () => {
 ACTIONS.annDel = (id) => confirmBox('Supprimer l’annonce', 'Supprimer cette annonce pour tous les membres ?', () => { DB.annonces = DB.annonces.filter((a) => a.id !== id); saveDB(); render(); }, t('del'));
 /* Compteurs (pastilles rouges du menu) */
 function commPending() { return (DB.messages || []).filter((m) => !(m.replies || []).length).length + (DB.suggestions || []).filter((s) => !s.reponse).length; }
-function memberUnread(code) {
+function memberUnread(code, kind) {
   if (!code) return 0;
   const ann = (DB.annonces || []).filter((a) => !(a.seen || []).includes(code)).length;
   const rep = (DB.messages || []).filter((m) => m.from_code === code && (m.replies || []).length > (m.replies_seen || 0)).length;
-  return ann + rep;
+  return kind === 'annonces' ? ann : kind === 'replies' ? rep : ann + rep;
 }
 /* À l'ouverture de « Mon compte », annonces et réponses sont marquées comme lues */
-function markMemberRead(code) {
+function markMemberRead(code, kind) {
   // Marqué comme lu après l'affichage : la pastille reste visible pendant cette visite
   clearTimeout(STATE.readTimer);
   STATE.readTimer = setTimeout(() => {
     if (!SESSION || SESSION.code !== code) return;
     let changed = false;
-    (DB.annonces || []).forEach((a) => { a.seen = a.seen || []; if (!a.seen.includes(code)) { a.seen.push(code); changed = true; } });
-    (DB.messages || []).forEach((m) => { if (m.from_code === code && (m.replies || []).length > (m.replies_seen || 0)) { m.replies_seen = m.replies.length; changed = true; } });
+    if (kind === 'annonces') (DB.annonces || []).forEach((a) => { a.seen = a.seen || []; if (!a.seen.includes(code)) { a.seen.push(code); changed = true; } });
+    if (kind === 'replies') (DB.messages || []).forEach((m) => { if (m.from_code === code && (m.replies || []).length > (m.replies_seen || 0)) { m.replies_seen = m.replies.length; changed = true; } });
     if (changed) saveDB();
   }, 2500);
 }
@@ -325,17 +325,8 @@ ACTIONS.suggReply = (id) => {
   });
 };
 /* Bloc « Mon compte » : mes messages et mes suggestions */
-function memberAnnoncesPanel(m) {
-  const ann = (DB.annonces || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 5);
-  if (!ann.length) return '';
-  const html = '<section class="panel"><div class="panel-head"><h2>Annonces du comité</h2>' + (canPostAnnonce() ? '<div class="right"><button class="btn btn-sm btn-primary" data-act="annNew">Publier une annonce</button></div>' : '') + '</div><div class="panel-body">' +
-    ann.map((a) => '<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)">' + (!(a.seen || []).includes(m.code) ? '<span class="badge b-red">Nouveau</span> ' : '') + '<b>' + esc(a.titre) + '</b>' +
-      '<div class="muted" style="font-size:11px">' + esc(a.by_name) + ' · ' + esc(fmtDT(a.date)) + '</div><div style="white-space:pre-wrap;margin-top:4px">' + esc(a.texte) + '</div></div>').join('') + '</div></section>';
-  markMemberRead(m.code);
-  return html;
-}
 function memberCommPanel(m) {
-  if ((DB.messages || []).some((x) => x.from_code === m.code && (x.replies || []).length > (x.replies_seen || 0))) markMemberRead(m.code);
+  if ((DB.messages || []).some((x) => x.from_code === m.code && (x.replies || []).length > (x.replies_seen || 0))) markMemberRead(m.code, 'replies');
   const mine = (DB.messages || []).filter((x) => x.from_code === m.code).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const sugg = (DB.suggestions || []).filter((x) => x.from_code === m.code);
   return '<section class="panel"><div class="panel-head"><h2>Messages au comité</h2><div class="right"><button class="btn btn-sm btn-primary" data-act="msgNew">Écrire au comité</button>' +

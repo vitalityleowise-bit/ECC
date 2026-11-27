@@ -380,23 +380,33 @@ function memberResumePanel() {
 ACTIONS.mrmonth = (_i, el) => { STATE.mrmonth = el.value; render(); };
 ACTIONS.mrOpen = () => { STATE.rmonth = STATE.mrmonth || lastReportMonth(); PAGES.rapport(); ACTIONS.rapportResume(); };
 ACTIONS.mrFull = () => { STATE.rmonth = STATE.mrmonth || lastReportMonth(); go('rapport'); };
+/* ---------- Espace du membre : une page par rubrique (menu « Mon compte ») ---------- */
+function myMember() { return currentMember(); }
+function infoRow(label, val) { return '<dt>' + esc(label) + '</dt><dd>' + (val ? esc(val) : '<span class="muted">—</span>') + '</dd>'; }
+function monthsSince(d) { d = parseD(d); if (!d) return 0; const t0 = today(); return Math.max(0, (t0.getFullYear() - d.getFullYear()) * 12 + t0.getMonth() - d.getMonth()); }
+/* Mon profil : grande photo, informations personnelles, situation, présences, réunions, messages au comité */
 PAGES.moncompte = function () {
-  const m = currentMember(); if (!m) return '';
-  const s = memberStats(m.code); const sc = creditScore(m.code);
-  const lt = s.loan ? loanTotals(s.loan) : null;
-  const mesDem = DB.demandes_pret.filter((d) => d.code_membre === m.code).sort((a, b) => b.id - a.id);
+  const m = myMember(); if (!m) return '';
+  const s = memberStats(m.code);
   const aNoter = m.is_comite ? DB.demandes_pret.filter((d) => d.statut === 'En attente' && d.code_membre !== m.code) : [];
+  const anc = monthsSince(m.date_adhesion);
   return importBanner() + meetingBanner() + loanBanner(m.code) +
-    '<section class="panel"><div class="member-head">' + avatar(m) + '<div><div class="nm">' + esc(memberName(m)) + '</div>' +
-      '<div class="muted"><span class="code">' + m.code + '</span> · ' + statusBadge(m.statut) + (m.is_comite ? ' <span class="badge b-navy">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div></div>' +
-      '<div style="margin-left:auto;text-align:right"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">' + t('next_meeting') + '</div><div><b>' + esc(longDate(nextMeeting())) + '</b></div>' +
-      '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px">' + t('to_pay') + '</div><div class="num" style="font-size:18px;font-weight:700;color:var(--orange)">' + money(s.totalAVerser) + '</div></div></div></section>' +
+    '<section class="panel profile"><div class="profile-head">' +
+      '<div class="profile-photo">' + (m.photo ? '<img alt="Photo de ' + esc(memberName(m)) + '" src="' + esc(m.photo) + '">' : '<span>' + esc(initials(m)) + '</span>') + '</div>' +
+      '<div class="profile-id"><div class="nm">' + esc(memberName(m)) + '</div>' +
+        '<div class="muted" style="margin:4px 0 10px"><span class="code">' + m.code + '</span> · ' + statusBadge(m.statut) + (m.is_comite ? ' <span class="badge b-navy">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div>' +
+        '<div class="profile-due"><div><div class="lbl">' + t('next_meeting') + '</div><b>' + esc(longDate(nextMeeting())) + '</b> · ' + esc(SETTINGS.meeting_hour) + '</div>' +
+        '<div><div class="lbl">' + t('to_pay') + '</div><span class="num" style="font-size:22px;font-weight:800;color:var(--orange)">' + money(s.totalAVerser) + '</span></div></div></div></div>' +
+      '<div class="panel-body" style="border-top:1px solid var(--line-soft)"><dl class="dl profile-dl">' +
+        infoRow('Téléphone', m.telephone) + infoRow('E-mail', m.email) + infoRow('Adresse', m.adresse) + infoRow('NIF', m.nif) +
+        infoRow('Date de naissance', m.date_naissance) + infoRow('Profession', m.profession) +
+        infoRow('Membre depuis', m.date_adhesion ? m.date_adhesion + (anc ? ' (' + anc + ' mois)' : '') : '') + infoRow('Poste au comité', m.is_comite ? m.comite_poste || 'Membre du comité' : '') +
+      '</dl><div class="muted" style="font-size:11.5px;margin-top:8px">Une information manque ou est fausse ? Écrivez au comité ci-dessous : le trésorier mettra votre fiche à jour.</div></div></section>' +
     (aNoter.length ? panel('Demandes à évaluer (comité)', table(['N°', 'Membre', ['Demandé', 'n'], 'Ma note', ''], aNoter.map((d) => {
       const n = d.evaluation && d.evaluation.notes_comite ? d.evaluation.notes_comite[m.code] : undefined;
       return '<tr><td class="code">#' + d.id + '</td><td>' + esc(nameOf(d.code_membre)) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + (n === undefined ? '<span class="badge b-orange">à donner</span>' : '<b class="num">' + fmt(n) + '/' + GRILLE.pts_comite + '</b>') + '</td>' +
         '<td class="act"><button class="btn btn-sm btn-accent" data-act="demEval" data-id="' + d.id + '">' + (n === undefined ? 'Donner ma note' : 'Voir / modifier') + '</button></td></tr>';
     })), { flush: true }) : '') +
-    memberAnnoncesPanel(m) + memberMeetingsPanel(m) + memberResumePanel() + memberCommPanel(m) +
     '<div class="kpis">' + kpi('Caisse Verte', fmt(s.verte) + ' <small>HTG</small>', 'mon épargne', 'green') + kpi('Caisse Rouge', fmt(s.rouge) + ' <small>HTG</small>', 'solidarité', 'red') +
       kpi('Total versé', fmt(s.total) + ' <small>HTG</small>', '', 'navy') + kpi('Reste dû', fmt(s.reste) + ' <small>HTG</small>', s.statut, s.reste ? 'orange' : 'green') + '</div>' +
     '<div class="grid-2"><div>' +
@@ -407,18 +417,60 @@ PAGES.moncompte = function () {
         (s.loanDue ? '<dt>Mensualité de prêt</dt><dd class="num">' + money(s.loanDue.du) + '</dd>' : '') +
         '<dt><b>Total à verser</b></dt><dd class="num"><b style="color:var(--orange)">' + money(s.totalAVerser) + '</b></dd></dl>', { meta: 'prochaine réunion' }) +
       panel('Présences aux réunions', attendanceSummary(s)) +
-      panel('Éligibilité au prêt', '<dl class="dl"><dt>Rencontres</dt><dd class="num">' + fmt(sc.pres.pts) + ' / ' + sc.pres.max + '</dd><dt>Cotisations</dt><dd class="num">' + fmt(sc.cot.pts) + ' / ' + sc.cot.max + '</dd>' +
-        '<dt>Prêts précédents</dt><dd class="num">' + fmt(sc.cred.pts) + ' / ' + sc.cred.max + '</dd><dt>Sous-total</dt><dd class="num"><b>' + fmt(sc.auto) + ' / ' + sc.autoMax + '</b></dd>' +
-        '<dt>Appréciation comité</dt><dd>/ ' + GRILLE.pts_comite + ', donnée lors de l’étude de la demande</dd><dt>Montant possible</dt><dd class="num">jusqu’à ' + money(sc.bestMax) + '</dd></dl>' +
-        '<div class="muted" style="margin-top:8px">La décision finale revient au comité.</div>') +
-    '</div><div>' +
-      panel('Mes demandes de prêt', table(['N°', 'Date', ['Montant', 'n'], 'Statut'], mesDem.map((d) => '<tr><td class="code">#' + d.id + '</td><td class="num">' + esc(d.date_demande) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + statusBadge(d.statut) +
-        (d.statut === 'Approuvée' ? ' <span class="muted num">' + fmt(d.montant_approuve) + '</span>' : '') + (d.commentaire_comite ? '<div class="muted" style="font-size:11px">' + esc(d.commentaire_comite) + '</div>' : '') + '</td></tr>')),
-        { flush: true, right: s.loan ? '<span class="muted" style="font-size:11.5px">Prêt en cours : nouvelle demande possible après remboursement</span>' : '<button class="btn btn-sm btn-primary" data-act="demNew" data-id="self">Faire une nouvelle demande</button>' }) +
-      panel('Prêt en cours', s.loan ? '<dl class="dl" style="margin-bottom:10px"><dt>Capital</dt><dd class="num">' + money(s.loan.capital) + '</dd><dt>Remboursé</dt><dd class="num">' + money(lt.rembourse) + '</dd><dt>Reste</dt><dd class="num">' + money(lt.reste) + '</dd></dl>' + scheduleTable(s.loan, false) : '<span class="muted">Aucun prêt en cours.</span>') +
-      panel('Historique des cotisations', table(['Date', ['Verte', 'n'], ['Rouge', 'n'], 'Mode'], s.cots.slice().sort((a, b) => parseD(b.date) - parseD(a.date)).map((c) =>
-        '<tr><td class="num">' + esc(c.date) + '</td><td class="n">' + fmt(c.verte) + '</td><td class="n">' + fmt(c.rouge) + '</td><td>' + esc(c.mode) + '</td></tr>')), { flush: true }) +
-    '</div></div>';
+    '</div><div>' + memberMeetingsPanel(m) + memberCommPanel(m) + '</div></div>';
+};
+PAGES.mesannonces = function () {
+  const m = myMember(); if (!m) return '';
+  const ann = (DB.annonces || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const html = pageHead(t('g_compte'), t('mesannonces'), ann.length + ' annonce(s) du comité', canPostAnnonce() ? '<button class="btn btn-primary" data-act="annNew">Publier une annonce</button>' : '') +
+    (ann.length ? ann.map((a) => '<div class="panel" style="border-left:3px solid var(--orange)"><div class="panel-head"><h2>' + (!(a.seen || []).includes(m.code) ? '<span class="badge b-red">Nouveau</span> ' : '') + esc(a.titre) + '</h2>' +
+      '<span class="meta">' + esc(a.by_name) + ' · ' + esc(fmtDT(a.date)) + '</span></div><div class="panel-body" style="white-space:pre-wrap">' + esc(a.texte) + '</div></div>').join('')
+      : '<div class="panel"><div class="empty">Aucune annonce pour le moment.</div></div>');
+  markMemberRead(m.code, 'annonces');
+  return html;
+};
+PAGES.monresume = function () { return pageHead(t('g_compte'), t('monresume'), 'Présenté par le trésorier, signé par la présidente') + memberResumePanel(); };
+PAGES.meligibilite = function () {
+  const m = myMember(); if (!m) return '';
+  const s = memberStats(m.code); const sc = creditScore(m.code);
+  return pageHead(t('g_compte'), t('meligibilite'), 'Grille d’évaluation de crédit UNIE-MUSO') +
+    '<div class="kpis">' + kpi('Sous-total automatique', fmt(sc.auto) + ' <small>/ ' + sc.autoMax + '</small>', '+ appréciation du comité / ' + GRILLE.pts_comite, 'navy') +
+      kpi('Montant possible', sc.bestSeuil.eligible ? fmt(sc.bestMax) + ' <small>HTG</small>' : '—', sc.bestSeuil.eligible ? 'au mieux : ' + sc.bestSeuil.label : 'note de 50 ou moins : non éligible', sc.bestSeuil.eligible ? 'green' : 'red') + '</div>' +
+    panel('Détail de ma note', '<dl class="dl"><dt>1. Rencontres (5 dernières)</dt><dd class="num">' + fmt(sc.pres.pts) + ' / ' + sc.pres.max + '</dd>' +
+      '<dt>2. Cotisations (5 derniers mois)</dt><dd class="num">' + fmt(sc.cot.pts) + ' / ' + sc.cot.max + '</dd>' +
+      '<dt>3. Prêts précédents</dt><dd class="num">' + fmt(sc.cred.pts) + ' / ' + sc.cred.max + '</dd>' +
+      '<dt>4. Appréciation du comité</dt><dd>/ ' + GRILLE.pts_comite + ', donnée lors de l’étude de la demande</dd>' +
+      '<dt>Cotisations Caisse Verte à jour</dt><dd class="num">' + money(s.verte) + '</dd></dl>' +
+      (s.loan ? '<div class="banner import" style="margin:12px 0 0"><span>Vous avez un prêt en cours : nouvelle demande possible après le remboursement complet.</span></div>' : '') +
+      '<div class="muted" style="margin-top:10px">La décision finale revient au comité.</div>') +
+    panel('Barème de décision', table(['Note finale', 'Observation', 'Somme approuvée'], GRILLE.seuils.map((x) => '<tr><td class="num">' + x.min + ' – ' + x.max + '</td><td>' + esc(x.label) + '</td><td>' + esc(x.regle || '') + '</td></tr>')), { flush: true });
+};
+PAGES.monpret = function () {
+  const m = myMember(); if (!m) return '';
+  const s = memberStats(m.code); const lt = s.loan ? loanTotals(s.loan) : null;
+  return loanBanner(m.code) + pageHead(t('g_compte'), t('monpret'), s.loan ? 'Prêt #' + s.loan.id + ' du ' + s.loan.date : '') +
+    (s.loan ? '<div class="kpis">' + kpi('Capital', fmt(s.loan.capital) + ' <small>HTG</small>', s.loan.duree + ' mois · ' + s.loan.taux + ' %', 'navy') + kpi('Remboursé', fmt(lt.rembourse) + ' <small>HTG</small>', lt.nbPaid + ' / ' + lt.nb + ' mensualités', 'green') +
+      kpi('Reste à rembourser', fmt(lt.reste) + ' <small>HTG</small>', lt.retard ? lt.retard + ' en retard' : 'aucun retard', lt.retard ? 'red' : 'orange') + '</div>' + panel('Échéancier', scheduleTable(s.loan, false), { flush: true })
+      : '<div class="panel"><div class="empty">Aucun prêt en cours.</div></div>');
+};
+PAGES.mesdemandes = function () {
+  const m = myMember(); if (!m) return '';
+  const s = memberStats(m.code);
+  const mesDem = DB.demandes_pret.filter((d) => d.code_membre === m.code).sort((a, b) => b.id - a.id);
+  return pageHead(t('g_compte'), t('mesdemandes'), mesDem.length + ' demande(s)', s.loan ? '' : '<button class="btn btn-primary" data-act="demNew" data-id="self">Faire une nouvelle demande</button>') +
+    (s.loan ? '<div class="banner import"><span>Vous avez un prêt en cours : nouvelle demande possible après le remboursement complet.</span></div>' : '') +
+    '<section class="panel">' + table(['N°', 'Date', ['Montant', 'n'], 'Motif', 'Statut'], mesDem.map((d) => '<tr><td class="code">#' + d.id + '</td><td class="num">' + esc(d.date_demande) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + esc(d.motif || '') + '</td><td>' + statusBadge(d.statut) +
+      (d.statut === 'Approuvée' ? ' <span class="muted num">' + fmt(d.montant_approuve) + ' · ' + d.duree_approuvee + ' mois</span>' : '') + (d.commentaire_comite ? '<div class="muted" style="font-size:11px">' + esc(d.commentaire_comite) + '</div>' : '') + '</td></tr>')) + '</section>';
+};
+PAGES.mescotisations = function () {
+  const m = myMember(); if (!m) return '';
+  const s = memberStats(m.code);
+  return pageHead(t('g_compte'), t('mescotisations'), s.cots.length + ' versement(s) · ' + money(s.total)) +
+    '<div class="kpis">' + kpi('Caisse Verte', fmt(s.verte) + ' <small>HTG</small>', 'mon épargne', 'green') + kpi('Caisse Rouge', fmt(s.rouge) + ' <small>HTG</small>', 'solidarité', 'red') +
+      kpi('Reste dû', fmt(s.reste) + ' <small>HTG</small>', s.statut, s.reste ? 'orange' : 'green') + '</div>' +
+    '<section class="panel">' + table(['Date', ['Verte', 'n'], ['Rouge', 'n'], ['Total', 'n'], 'Mode'], s.cots.slice().sort((a, b) => parseD(b.date) - parseD(a.date)).map((c) =>
+      '<tr><td class="num">' + esc(c.date) + '</td><td class="n">' + fmt(c.verte) + '</td><td class="n">' + fmt(c.rouge) + '</td><td class="n">' + fmt(num(c.verte) + num(c.rouge)) + '</td><td>' + esc(c.mode) + '</td></tr>'),
+      '<tr><td>Total</td><td class="n">' + fmt(s.verte) + '</td><td class="n">' + fmt(s.rouge) + '</td><td class="n">' + fmt(s.total) + '</td><td></td></tr>') + cotLateDetail(s).replace('margin-top:4px', 'padding:10px 16px') + '</section>';
 };
 
 /* ---------- Sauvegarde ---------- */

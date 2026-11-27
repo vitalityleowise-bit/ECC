@@ -3,9 +3,9 @@
    ========================================================================= */
 const I18N = {
   fr: {
-    g_gestion: 'Gestion', g_compte: 'Mon compte', g_comm: 'Communication', reunions: 'Réunions et quorum', messages: 'Messages et suggestions', dons: 'Dons et subventions', plancomptable: 'Plan comptable', g_treso: 'Trésorerie', g_compta: 'Comptabilité', g_rapports: 'Rapports', g_docs: 'Documents', g_outils: 'Outils',
+    g_gestion: 'Gestion', g_compte: 'Mon compte', g_comm: 'Communication', mesannonces: 'Annonces du comité', monresume: 'Résumé du rapport mensuel', meligibilite: 'Éligibilité au prêt', monpret: 'Prêt en cours', mesdemandes: 'Mes demandes de prêt', mescotisations: 'Historique des cotisations', reunions: 'Réunions et quorum', messages: 'Messages et suggestions', dons: 'Dons et subventions', plancomptable: 'Plan comptable', g_treso: 'Trésorerie', g_compta: 'Comptabilité', g_rapports: 'Rapports', g_docs: 'Documents', g_outils: 'Outils',
     dashboard: 'Tableau de bord', membres: 'Membres', cotisations: 'Cotisations', previsions: 'Prévisions', prets: 'Prêts & remboursements',
-    demandes: 'Demandes de prêt', grille: 'Grille de crédit', depenses: 'Dépenses', stats: 'Statistiques', moncompte: 'Mon compte',
+    demandes: 'Demandes de prêt', grille: 'Grille de crédit', depenses: 'Dépenses', stats: 'Statistiques', moncompte: 'Mon profil',
     caisse: 'Caisse', banque: 'Banque', journal: 'Journal', balance: 'Balance', bilan: 'Bilan', resultats: 'État résultats',
     rapport: 'Rapport mensuel', statuts: 'Statuts', reglement: 'Règlement interne', sauvegarde: 'Sauvegarde', parametres: 'Paramètres',
     login_title: 'Connexion', login_id: 'Identifiant', login_pwd: 'Mot de passe', login_btn: 'Se connecter', show: 'Voir', hide: 'Masquer',
@@ -16,9 +16,9 @@ const I18N = {
     tagline: 'Mutuelle de solidarité — épargne, crédit et entraide entre membres.',
   },
   kr: {
-    g_gestion: 'Jesyon', g_compte: 'Kont mwen', g_comm: 'Kominikasyon', reunions: 'Reyinyon ak kowòm', messages: 'Mesaj ak sijesyon', dons: 'Don ak sibvansyon', plancomptable: 'Plan kontab', g_treso: 'Trezori', g_compta: 'Kontablite', g_rapports: 'Rapò', g_docs: 'Dokiman', g_outils: 'Zouti',
+    g_gestion: 'Jesyon', g_compte: 'Kont mwen', g_comm: 'Kominikasyon', mesannonces: 'Anons komite a', monresume: 'Rezime rapò mansyèl la', meligibilite: 'Kalifikasyon pou prè', monpret: 'Prè an kou', mesdemandes: 'Demann prè mwen yo', mescotisations: 'Istorik kotizasyon', reunions: 'Reyinyon ak kowòm', messages: 'Mesaj ak sijesyon', dons: 'Don ak sibvansyon', plancomptable: 'Plan kontab', g_treso: 'Trezori', g_compta: 'Kontablite', g_rapports: 'Rapò', g_docs: 'Dokiman', g_outils: 'Zouti',
     dashboard: 'Tablo jeneral', membres: 'Manm yo', cotisations: 'Kotizasyon', previsions: 'Previzyon', prets: 'Prè ak ranbousman',
-    demandes: 'Demann prè', grille: 'Grid kredi', depenses: 'Depans', stats: 'Estatistik', moncompte: 'Kont mwen',
+    demandes: 'Demann prè', grille: 'Grid kredi', depenses: 'Depans', stats: 'Estatistik', moncompte: 'Pwofil mwen',
     caisse: 'Kès', banque: 'Bank', journal: 'Jounal', balance: 'Balans', bilan: 'Bilan', resultats: 'Rezilta',
     rapport: 'Rapò chak mwa', statuts: 'Estati', reglement: 'Règleman entèn', sauvegarde: 'Sovgad', parametres: 'Paramèt',
     login_title: 'Konekte', login_id: 'Idantifyan', login_pwd: 'Modpas', login_btn: 'Antre', show: 'Wè', hide: 'Kache',
@@ -156,6 +156,12 @@ const PAGE_DEFS = [
   { id: 'dons', g: 'g_gestion', roles: ['admin', 'editeur'] },
   { id: 'stats', g: 'g_gestion', roles: ['admin', 'editeur'] },
   { id: 'moncompte', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'mesannonces', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'monresume', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'meligibilite', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'monpret', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'mesdemandes', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'mescotisations', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
   { id: 'messages', g: 'g_comm', roles: ['admin', 'editeur', 'comite'] },
   { id: 'caisse', g: 'g_treso', roles: ['admin', 'editeur'] },
   { id: 'banque', g: 'g_treso', roles: ['admin', 'editeur'] },
@@ -238,7 +244,8 @@ function sidebarHTML() {
     g.items.push(p);
   });
   const pending = DB.demandes_pret.filter((d) => d.statut === 'En attente').length;
-  const counts = { demandes: pending, messages: commPending(), moncompte: memberUnread(SESSION && SESSION.type === 'member' ? SESSION.code : null) };
+  const me = SESSION && SESSION.type === 'member' ? SESSION.code : null;
+  const counts = { demandes: pending, messages: commPending(), moncompte: memberUnread(me, 'replies'), mesannonces: memberUnread(me, 'annonces') };
   STATE.navTotal = PAGE_DEFS.filter((p) => canSee(p.id)).reduce((s2, p) => s2 + (counts[p.id] || 0), 0);
   const roleLabel = { admin: 'Administrateur', editeur: 'Autorisé à modifier', membre: 'Membre', comite: 'Membre du comité' }[currentRole()];
   const u = SESSION.type === 'user' ? USERS[SESSION.id] : null; const m = currentMember();
