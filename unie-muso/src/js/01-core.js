@@ -89,8 +89,8 @@ const DEFAULT_SETTINGS = {
   ],
   meeting_hour: '17:00',
   editor_code: 'M004', // 2e personne autorisée à modifier (membre du comité choisi par le trésorier)
-  sign_presidente: 'Mme VALLON Rose Abigail',
-  sign_tresorier: 'PATRICE MICHELET RICHEMOND LEONARDO',
+  sign_presidente: '',
+  sign_tresorier: '',
   notif_asked: false,
 };
 
