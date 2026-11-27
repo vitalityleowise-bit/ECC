@@ -17,8 +17,14 @@ function hasKey(name) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+// LLM goes live when a provider is selected. For OpenAI the key may be injected
+// by the proxy (this session) or set as OPENAI_API_KEY (a real server), so the
+// mode follows LLM_PROVIDER, not only the presence of a key.
+const llmProvider = (process.env.LLM_PROVIDER || '').toLowerCase();
+const llmLive = llmProvider === 'openai' || hasKey('LLM_API_KEY');
+
 const mode = {
-  llm: hasKey('LLM_API_KEY') ? 'live' : 'mock',
+  llm: llmLive ? 'live' : 'mock',
   stt: hasKey('STT_API_KEY') ? 'live' : 'mock',
   tts: hasKey('TTS_API_KEY') ? 'live' : 'mock',
   pronunciation: hasKey('PRONUNCIATION_API_KEY') ? 'live' : 'mock',
@@ -33,11 +39,14 @@ async function runTutorTurn({ task, systemPrompt, learnerText }) {
       tier,
       reply: `(${tier}) I heard: "${learnerText}". Let's keep going!`,
       correction: 'ok',
-      tip: 'Mock mode: set LLM_API_KEY to use the real tutor.',
+      tip: 'Mock mode: set LLM_PROVIDER=openai and add a key to use the real tutor.',
     };
   }
-  // LIVE: implemented in a later step using the configured provider.
-  throw new Error('LLM live adapter not implemented yet');
+  if (llmProvider === 'openai' || llmProvider === '') {
+    // Default live provider is OpenAI.
+    return require('./openai').runTutorTurn({ task, systemPrompt, learnerText });
+  }
+  throw new Error(`Unknown LLM provider: ${llmProvider}`);
 }
 
 // ---- Speech to text ---------------------------------------------------------
