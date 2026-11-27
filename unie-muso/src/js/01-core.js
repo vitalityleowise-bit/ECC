@@ -112,7 +112,7 @@ function clone(o) { return o === undefined ? undefined : JSON.parse(JSON.stringi
 let DB, USERS, RULES, GRILLE, SETTINGS, DOCS;
 function normalizeDB(d) {
   d = d || {};
-  ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'demandes_pret', 'transferts', 'reunions', 'dons', 'messages', 'suggestions']
+  ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'demandes_pret', 'transferts', 'reunions', 'dons', 'messages', 'suggestions', 'annonces']
     .forEach((k) => { if (!Array.isArray(d[k])) d[k] = []; });
   d.members.forEach((m) => {
     ['can_see_documents', 'comite_see_demandes', 'comite_see_compta', 'comite_see_reports'].forEach((k) => {

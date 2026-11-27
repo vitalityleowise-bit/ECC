@@ -140,7 +140,7 @@ function afterLogin() {
   render();
   tryShowNotifications(true);
 }
-function logout() { SESSION = null; try { localStorage.removeItem(KEYS.session); } catch (_e) { /* */ } renderLogin(); }
+function logout() { SESSION = null; STATE = { page: 'dashboard', param: null }; try { localStorage.removeItem(KEYS.session); } catch (_e) { /* */ } renderLogin(); }
 
 /* Pages : groupe, droits d'accès */
 const PAGE_DEFS = [
@@ -238,19 +238,22 @@ function sidebarHTML() {
     g.items.push(p);
   });
   const pending = DB.demandes_pret.filter((d) => d.statut === 'En attente').length;
+  const counts = { demandes: pending, messages: commPending(), moncompte: memberUnread(SESSION && SESSION.type === 'member' ? SESSION.code : null) };
+  STATE.navTotal = PAGE_DEFS.filter((p) => canSee(p.id)).reduce((s2, p) => s2 + (counts[p.id] || 0), 0);
   const roleLabel = { admin: 'Administrateur', editeur: 'Autorisé à modifier', membre: 'Membre', comite: 'Membre du comité' }[currentRole()];
   const u = SESSION.type === 'user' ? USERS[SESSION.id] : null; const m = currentMember();
   return '<aside class="sidebar" aria-label="Navigation">' +
     '<div class="sb-brand">' + logoImg() + '<div><div class="t">UNIE-MUSO</div><div class="s">Petit-Goâve</div></div></div>' +
     groups.map((g) => {
       const link = (p, sub) => '<button class="sb-link' + (sub ? ' sb-sub' : '') + (STATE.page === p.id ? ' active' : '') + '" data-go="' + p.id + '">' + t(p.id) +
-        (p.id === 'demandes' && pending ? '<span class="count">' + pending + '</span>' : '') + '</button>';
+        (counts[p.id] ? '<span class="count">' + counts[p.id] + '</span>' : '') + '</button>';
       // Groupe d'une seule page : lien direct, sans titre
       if (g.items.length === 1) return '<div class="sb-group">' + link(g.items[0]) + '</div>';
       // Chaque groupe est un bouton qui se déroule ; celui de la page affichée reste ouvert
       const open = groupOpen(g.g, g.items.some((p) => p.id === STATE.page));
+      const hidden = open ? 0 : sum(g.items, (p) => counts[p.id] || 0);
       return '<div class="sb-group"><button class="sb-link sb-toggle' + (open ? ' open' : '') + '" data-act="toggleGroup" data-id="' + g.g + '" aria-expanded="' + open + '">' + t(g.g) +
-        '<span class="chev">' + (open ? '▾' : '▸') + '</span></button>' + (open ? g.items.map((p) => link(p, true)).join('') : '') + '</div>';
+        (hidden ? '<span class="count">' + hidden + '</span>' : '') + '<span class="chev">' + (open ? '▾' : '▸') + '</span></button>' + (open ? g.items.map((p) => link(p, true)).join('') : '') + '</div>';
     }).join('') +
     '<div class="sb-foot"><div class="who">' + esc(currentName()) + '</div><div class="role">' +
       esc((u && u.position) || (m && m.comite_poste) || roleLabel) + (m ? ' · ' + m.code : '') + '</div>' +
@@ -271,7 +274,7 @@ function render() {
   document.getElementById('root').innerHTML =
     '<div class="app">' + sidebarHTML() +
       '<div class="main"><header class="topbar">' +
-        '<button class="mobile-topbar-btn" data-menu aria-label="Menu">☰</button>' +
+        '<button class="mobile-topbar-btn" data-menu aria-label="Menu">☰' + (STATE.navTotal ? '<span class="badge-count">' + STATE.navTotal + '</span>' : '') + '</button>' +
         '<div class="crumb">' + esc(crumbGroup) + ' / <b>' + esc(t(STATE.page)) + '</b></div><div class="spacer"></div>' +
         '<div class="lang-switch" role="group" aria-label="Langue">' + ['fr', 'kr'].map((l) => '<button class="' + (currentLang() === l ? 'on' : '') + '" data-act="setLang" data-id="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</div>' +
         '<div class="today">' + esc(longDate(today())) + '</div></header>' +

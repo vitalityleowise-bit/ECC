@@ -225,9 +225,14 @@ PAGES.messages = function () {
   const msgs = (DB.messages || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const sugg = (DB.suggestions || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const waiting = msgs.filter((m) => !(m.replies || []).length).length;
+  const sansSuite = sugg.filter((s) => !s.reponse).length;
+  const ann = (DB.annonces || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   let body;
   if (tab === 'messages') {
     body = msgs.length ? msgs.map((m) => messageThread(m, true)).join('') : '<div class="panel"><div class="empty">Aucun message pour le moment.</div></div>';
+  } else if (tab === 'annonces') {
+    body = '<div style="margin-bottom:10px"><button class="btn btn-primary" data-act="annNew">Publier une annonce</button></div>' +
+      (ann.length ? ann.map((a) => annonceCard(a, true)).join('') : '<div class="panel"><div class="empty">Aucune annonce. Une annonce publiée ici est visible par tous les membres dans « Mon compte ».</div></div>');
   } else {
     body = '<section class="panel">' + table(['Date', 'Membre', 'Suggestion', 'Suite donnée', ''], sugg.map((s) =>
       '<tr><td class="num">' + esc(fmtDT(s.date)) + '</td><td>' + esc(s.anonyme ? 'Anonyme' : s.from_name) + '</td><td style="white-space:pre-wrap">' + esc(s.texte) + '</td>' +
@@ -236,10 +241,53 @@ PAGES.messages = function () {
   }
   return pageHead('Communication', t('messages'), 'Les membres écrivent depuis « Mon compte » ; le comité répond ici. Chaque message indique qui l’a envoyé et qui a répondu.') +
     '<div class="tabs"><button class="' + (tab === 'messages' ? 'on' : '') + '" data-act="mtab" data-id="messages">Messages' + (waiting ? ' (' + waiting + ' en attente)' : '') + '</button>' +
-    '<button class="' + (tab === 'suggestions' ? 'on' : '') + '" data-act="mtab" data-id="suggestions">Suggestions (' + sugg.length + ')</button></div>' + body +
+    '<button class="' + (tab === 'suggestions' ? 'on' : '') + '" data-act="mtab" data-id="suggestions">Suggestions' + (sansSuite ? ' (' + sansSuite + ' sans réponse)' : ' (' + sugg.length + ')') + '</button>' +
+    '<button class="' + (tab === 'annonces' ? 'on' : '') + '" data-act="mtab" data-id="annonces">Annonces du comité (' + ann.length + ')</button></div>' + body +
     '<div class="muted" style="margin-top:6px">Avec la version en ligne, les messages arriveront automatiquement sur les téléphones, avec notification.</div>';
 };
 ACTIONS.mtab = (id) => { STATE.mtab = id; render(); };
+/* ---------- Annonces du comité : tout membre du comité publie, tous les membres lisent ---------- */
+function annonceCard(a, manage) {
+  const lus = (a.seen || []).length; const total = DB.members.filter((m) => m.statut !== 'Inactif').length;
+  return '<div class="panel" style="border-left:3px solid var(--orange)"><div class="panel-head"><h2>' + esc(a.titre) + '</h2><span class="meta">par <b>' + esc(a.by_name) + '</b> · ' + esc(fmtDT(a.date)) + '</span>' +
+    (manage ? '<div class="right"><span class="muted" style="font-size:11.5px">lue par ' + lus + '/' + total + '</span>' + (canPostAnnonce() ? '<button class="btn btn-sm btn-danger" data-act="annDel" data-id="' + a.id + '">' + t('del') + '</button>' : '') + '</div>' : '') +
+    '</div><div class="panel-body" style="white-space:pre-wrap">' + esc(a.texte) + '</div></div>';
+}
+function canPostAnnonce() { const r = currentRole(); return r === 'admin' || r === 'editeur' || r === 'comite'; }
+ACTIONS.annNew = () => {
+  if (!canPostAnnonce()) return;
+  openModal({
+    title: 'Publier une annonce', submit: 'Publier',
+    body: field('Titre', input('titre', '', 'required maxlength="90"')) + field('Message à tous les membres', '<textarea name="texte" rows="6" required></textarea>', '', 'Visible par tous les membres dans « Mon compte », avec votre nom.'),
+    onSubmit: (v) => {
+      if (!v.titre.trim() || !v.texte.trim()) { toast('Titre et message obligatoires.', 'err'); return false; }
+      const a = myAuthor(); DB.annonces = DB.annonces || [];
+      DB.annonces.push({ id: uid(), by_code: a.code, by_name: a.name, date: nowISO(), titre: v.titre.trim(), texte: v.texte.trim(), seen: a.code ? [a.code] : [] });
+      saveDB(); toast('Annonce publiée pour tous les membres.', 'ok'); render();
+    },
+  });
+};
+ACTIONS.annDel = (id) => confirmBox('Supprimer l’annonce', 'Supprimer cette annonce pour tous les membres ?', () => { DB.annonces = DB.annonces.filter((a) => a.id !== id); saveDB(); render(); }, t('del'));
+/* Compteurs (pastilles rouges du menu) */
+function commPending() { return (DB.messages || []).filter((m) => !(m.replies || []).length).length + (DB.suggestions || []).filter((s) => !s.reponse).length; }
+function memberUnread(code) {
+  if (!code) return 0;
+  const ann = (DB.annonces || []).filter((a) => !(a.seen || []).includes(code)).length;
+  const rep = (DB.messages || []).filter((m) => m.from_code === code && (m.replies || []).length > (m.replies_seen || 0)).length;
+  return ann + rep;
+}
+/* À l'ouverture de « Mon compte », annonces et réponses sont marquées comme lues */
+function markMemberRead(code) {
+  // Marqué comme lu après l'affichage : la pastille reste visible pendant cette visite
+  clearTimeout(STATE.readTimer);
+  STATE.readTimer = setTimeout(() => {
+    if (!SESSION || SESSION.code !== code) return;
+    let changed = false;
+    (DB.annonces || []).forEach((a) => { a.seen = a.seen || []; if (!a.seen.includes(code)) { a.seen.push(code); changed = true; } });
+    (DB.messages || []).forEach((m) => { if (m.from_code === code && (m.replies || []).length > (m.replies_seen || 0)) { m.replies_seen = m.replies.length; changed = true; } });
+    if (changed) saveDB();
+  }, 2500);
+}
 ACTIONS.msgReply = (id) => {
   const ta = document.querySelector('[data-reply="' + id + '"]'); const txt = ta ? ta.value.trim() : '';
   if (!txt) { toast('Écrivez votre réponse.', 'err'); return; }
@@ -277,7 +325,17 @@ ACTIONS.suggReply = (id) => {
   });
 };
 /* Bloc « Mon compte » : mes messages et mes suggestions */
+function memberAnnoncesPanel(m) {
+  const ann = (DB.annonces || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 5);
+  if (!ann.length) return '';
+  const html = '<section class="panel"><div class="panel-head"><h2>Annonces du comité</h2>' + (canPostAnnonce() ? '<div class="right"><button class="btn btn-sm btn-primary" data-act="annNew">Publier une annonce</button></div>' : '') + '</div><div class="panel-body">' +
+    ann.map((a) => '<div style="padding:8px 0;border-bottom:1px solid var(--line-soft)">' + (!(a.seen || []).includes(m.code) ? '<span class="badge b-red">Nouveau</span> ' : '') + '<b>' + esc(a.titre) + '</b>' +
+      '<div class="muted" style="font-size:11px">' + esc(a.by_name) + ' · ' + esc(fmtDT(a.date)) + '</div><div style="white-space:pre-wrap;margin-top:4px">' + esc(a.texte) + '</div></div>').join('') + '</div></section>';
+  markMemberRead(m.code);
+  return html;
+}
 function memberCommPanel(m) {
+  if ((DB.messages || []).some((x) => x.from_code === m.code && (x.replies || []).length > (x.replies_seen || 0))) markMemberRead(m.code);
   const mine = (DB.messages || []).filter((x) => x.from_code === m.code).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const sugg = (DB.suggestions || []).filter((x) => x.from_code === m.code);
   return '<section class="panel"><div class="panel-head"><h2>Messages au comité</h2><div class="right"><button class="btn btn-sm btn-primary" data-act="msgNew">Écrire au comité</button>' +
