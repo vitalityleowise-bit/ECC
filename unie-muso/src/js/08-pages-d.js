@@ -350,5 +350,8 @@ function showWelcome() {
     '<button class="btn btn-accent" data-close-welcome>' + (currentLang() === 'kr' ? 'Antre' : 'Entrer') + '</button></div>';
   document.body.appendChild(el);
   // L'image reste affichée jusqu'à ce que la personne touche « Entrer »
-  el.querySelector('[data-close-welcome]').addEventListener('click', () => { el.classList.add('out'); setTimeout(() => el.remove(), 350); });
+  el.querySelector('[data-close-welcome]').addEventListener('click', () => {
+    el.classList.add('out'); setTimeout(() => el.remove(), 350);
+    if (typeof ONLINE !== 'undefined' && ONLINE.pendingRender) { ONLINE.pendingRender = false; setTimeout(render, 360); }
+  });
 }

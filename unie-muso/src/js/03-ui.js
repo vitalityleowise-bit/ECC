@@ -72,7 +72,11 @@ function openModal(opts) {
   if (first && !opts.noFocus) setTimeout(() => first.focus(), 30);
   return back;
 }
-function closeModal() { const m = document.getElementById('modal'); if (m) m.remove(); }
+function closeModal() {
+  const m = document.getElementById('modal'); if (m) m.remove();
+  // Données reçues en ligne pendant que la fenêtre était ouverte : on réaffiche maintenant
+  if (m && typeof ONLINE !== 'undefined' && ONLINE.pendingRender) { ONLINE.pendingRender = false; setTimeout(render, 0); }
+}
 function formData(form) {
   const o = {};
   form.querySelectorAll('[name]').forEach((el) => {
@@ -123,6 +127,14 @@ function onLogin(e) {
   const key = Object.keys(USERS).find((k) => k.toLowerCase() === id.toLowerCase());
   if (key && USERS[key].pwd === pwd) { SESSION = { type: 'user', id: key }; afterLogin(); return; }
   if (memberLogin(id, pwd)) { afterLogin(); return; }
+  if (typeof onlineFirstLogin === 'function' && onlineAvailable() && navigator.onLine) {
+    err.textContent = 'Recherche du compte en ligne…';
+    onlineFirstLogin(id, pwd).then((ok) => {
+      if (ok && memberLogin(id, pwd)) { afterLogin(); return; }
+      err.textContent = t('login_err');
+    });
+    return;
+  }
   err.textContent = t('login_err');
 }
 function memberLogin(id, pwd) {
@@ -137,10 +149,11 @@ function afterLogin() {
   const role = currentRole();
   STATE.page = role === 'membre' || role === 'comite' ? 'moncompte' : 'dashboard';
   showWelcome();
+  if (typeof goOnline === 'function') goOnline();
   render();
   tryShowNotifications(true);
 }
-function logout() { SESSION = null; STATE = { page: 'dashboard', param: null }; try { localStorage.removeItem(KEYS.session); } catch (_e) { /* */ } renderLogin(); }
+function logout() { if (typeof goOffline === 'function') goOffline(); SESSION = null; STATE = { page: 'dashboard', param: null }; try { localStorage.removeItem(KEYS.session); } catch (_e) { /* */ } renderLogin(); }
 
 /* Pages : groupe, droits d'accès */
 const PAGE_DEFS = [
@@ -283,6 +296,7 @@ function render() {
       '<div class="main"><header class="topbar">' +
         '<button class="mobile-topbar-btn" data-menu aria-label="Menu">☰' + (STATE.navTotal ? '<span class="badge-count">' + STATE.navTotal + '</span>' : '') + '</button>' +
         '<div class="crumb">' + esc(crumbGroup) + ' / <b>' + esc(t(STATE.page)) + '</b></div><div class="spacer"></div>' +
+        (typeof netStatusHTML === 'function' ? netStatusHTML() : '') +
         '<div class="lang-switch" role="group" aria-label="Langue">' + ['fr', 'kr'].map((l) => '<button class="' + (currentLang() === l ? 'on' : '') + '" data-act="setLang" data-id="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</div>' +
         '<div class="today">' + esc(longDate(today())) + '</div></header>' +
         '<main class="content" id="content">' + html + '</main></div></div>';
@@ -306,6 +320,7 @@ function setMyLang(l) {
   store.rawSet(LANG_KEY, l);
   if (SESSION && SESSION.type === 'member') { const m = getMember(SESSION.code); if (m) { m.lang = l; saveDB(); } }
   else if (SESSION && USERS[SESSION.id]) { USERS[SESSION.id].lang = l; saveUsers(); }
+  if (typeof pushPref === 'function') { ONLINE.prefLang = l; pushPref(l); }
 }
 /* Délégation d'événements : data-act="nom" data-id="..." */
 const ACTIONS = {};

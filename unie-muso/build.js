@@ -23,7 +23,9 @@ const js = ['/* UNIE-MUSO — application autonome hors ligne */', 'const EMBEDD
   'const PRIVATE_SEED = ' + JSON.stringify(privateSeed) + ';',
   // Règles et paramètres de la mutuelle repris de la dernière sauvegarde du trésorier (fichiers privés)
   'const PRIVATE_RULES = ' + JSON.stringify(readPrivate('rules.json')) + ';',
-  'const PRIVATE_SETTINGS = ' + JSON.stringify(readPrivate('settings.json')) + ';']
+  'const PRIVATE_SETTINGS = ' + JSON.stringify(readPrivate('settings.json')) + ';',
+  // Configuration du projet Firebase (fichier privé) : active la version en ligne
+  'const PRIVATE_FIREBASE = ' + JSON.stringify(readPrivate('firebase.json')) + ';']
   .concat(jsFiles.map((f) => '/* ---- ' + f + ' ---- */\n' + fs.readFileSync(path.join(src, 'js', f), 'utf8')))
   .join('\n');
 // Le JS est enveloppé pour isoler la portée tout en gardant les fonctions globales utilisées par les attributs onclick
@@ -33,7 +35,12 @@ const fonts = [400, 600, 700, 800].map((w) => {
   const f = path.join(fontDir, 'plus-jakarta-sans-latin-' + w + '-normal.woff2');
   return fs.existsSync(f) ? "@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:" + w + ";font-display:swap;src:url(data:font/woff2;base64," + fs.readFileSync(f).toString('base64') + ") format('woff2');}" : '';
 }).join('\n');
+// Kit Firebase (Apache-2.0) embarqué : l'application démarre même sans Internet
+const vendorDir = path.join(root, 'vendor', 'firebase');
+const vendor = readPrivate('firebase.json') ? ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']
+  .map((f) => '<script>' + fs.readFileSync(path.join(vendorDir, f), 'utf8').replace(/<\/script/gi, '<\\/script').replace(/\/\/# sourceMappingURL=.*$/gm, '') + '</script>').join('\n') : '';
 const html = fs.readFileSync(path.join(src, 'index.html'), 'utf8')
+  .split('__VENDOR__').join(vendor)
   .split('__FONTS__').join(fonts)
   .split('__CSS__').join(css)
   .split('__LOGO__').join(logo)

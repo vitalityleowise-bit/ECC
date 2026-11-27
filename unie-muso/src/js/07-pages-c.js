@@ -503,7 +503,7 @@ ACTIONS.resetDB = () => confirmBox('Réinitialiser la base', 'Toutes les cotisat
 /* ---------- Paramètres ---------- */
 PAGES.parametres = function () {
   const tab = STATE.ptab || 'general';
-  const tabs = [['general', 'Général'], ['regles', 'Règles et amendes'], ['portail', 'Accès portail des membres'], ['comptes', 'Comptes de gestion'], ['alarmes', 'Alarmes']];
+  const tabs = [['general', 'Général'], ['regles', 'Règles et amendes'], ['portail', 'Accès portail des membres'], ['comptes', 'Comptes de gestion'], ['alarmes', 'Alarmes'], ['enligne', 'En ligne']];
   let body = '';
   if (tab === 'general') {
     body = '<form data-form="general" class="panel"><div class="panel-body"><div class="form-grid">' +
@@ -537,6 +537,8 @@ PAGES.parametres = function () {
       '<datalist id="postes">' + ['Présidente', 'Président', 'Vice-président(e)', 'Secrétaire', 'Secrétaire adjoint(e)', 'Trésorier', 'Contrôleur', 'Responsable crédit', 'Responsable cotisation'].map((p) => '<option value="' + p + '">').join('') + '</datalist>' +
       table(['Code', 'Membre', 'Mot de passe', ['Docs', 'c'], ['Comité', 'c'], 'Poste', ['Demandes', 'c'], ['Compta.', 'c'], ['Rapport', 'c']], rows) +
       '<div class="section-note">Tous les membres du comité peuvent noter les demandes de prêt depuis « Mon compte ». Les cases Demandes / Compta. / Rapport ouvrent les pages correspondantes.</div></section>';
+  } else if (tab === 'enligne') {
+    body = onlineSettingsHTML();
   } else if (tab === 'comptes') {
     body = '<section class="panel"><div class="toolbar"><button class="btn btn-sm btn-primary" data-act="userEdit">Ajouter un compte</button></div>' +
       table(['Identifiant', 'Nom complet', 'Fonction', 'Rôle', ''], Object.keys(USERS).map((k) => '<tr><td class="code">' + esc(k) + '</td><td>' + esc(USERS[k].fullname) + '</td><td>' + esc(USERS[k].position || '') + '</td><td>' + esc(USERS[k].role) + '</td>' +
@@ -576,13 +578,17 @@ ACTIONS.perm = (key, el) => {
   const [code, k] = key.split(':'); const m = getMember(code);
   m[k] = el.checked;
   if (k === 'is_comite' && el.checked) { m.comite_see_demandes = true; m.comite_see_compta = true; m.comite_see_reports = true; }
-  saveDB(); render();
+  saveDB(); render(); if (typeof syncRolesOnly === 'function') syncRolesOnly();
 };
 ACTIONS.poste = (code, el) => { getMember(code).comite_poste = el.value.trim(); saveDB(); toast('Poste enregistré.', 'ok'); };
 ACTIONS.setPwd = (code) => openModal({
   title: 'Mot de passe — ' + code + ' ' + nameOf(code), submit: t('save'),
   body: field('Nouveau mot de passe', input('pwd', getMember(code).portal_password || '', 'autocapitalize="off" autocorrect="off"'), '', 'Laisser vide pour bloquer l’accès au portail.'),
-  onSubmit: (v) => { getMember(code).portal_password = v.pwd; saveDB(); toast('Mot de passe enregistré.', 'ok'); render(); },
+  onSubmit: (v) => {
+    const m = getMember(code); const old = m.portal_password; m.portal_password = v.pwd; saveDB(); toast('Mot de passe enregistré.', 'ok'); render();
+    // Même changement sur le compte en ligne du membre
+    if (m.uid && old && v.pwd && old !== v.pwd && typeof changeOnlinePassword === 'function') changeOnlinePassword(code, old, v.pwd).then((ok) => { if (!ok && ONLINE.who) toast('Compte en ligne non mis à jour : cliquez « Créer / mettre à jour les comptes » (Paramètres > En ligne).', 'warn'); });
+  },
 });
 ACTIONS.defaultPwds = () => {
   let n = 0; DB.members.forEach((m) => { if (!m.portal_password) { m.portal_password = m.code.toLowerCase(); n++; } });
@@ -601,12 +607,16 @@ ACTIONS.userEdit = (id) => {
       if (!k || !v.pwd) { toast('Identifiant et mot de passe obligatoires.', 'err'); return false; }
       if (!id && (USERS[k] || getMember(k.toUpperCase()))) { toast('Cet identifiant existe déjà.', 'err'); return false; }
       if (id === SESSION.id && v.role !== 'admin' && Object.keys(USERS).filter((x) => USERS[x].role === 'admin').length <= 1) { toast('Il faut garder au moins un administrateur.', 'err'); return false; }
-      USERS[k] = { pwd: v.pwd, role: v.role, fullname: v.fullname, position: v.position, member_code: v.member_code }; saveUsers(); toast('Compte enregistré.', 'ok'); render();
+      const oldPwd = USERS[k] && USERS[k].pwd;
+      USERS[k] = { pwd: v.pwd, role: v.role, fullname: v.fullname, position: v.position, member_code: v.member_code }; saveUsers();
+      if (k === 'admin' && oldPwd !== v.pwd && typeof changeAdminOnlinePassword === 'function' && ONLINE.who) {
+        changeAdminOnlinePassword(v.pwd).then((ok) => toast(ok ? 'Mot de passe aussi changé en ligne.' : 'Mot de passe en ligne non changé : reconnectez-vous puis recommencez.', ok ? 'ok' : 'warn'));
+      } toast('Compte enregistré.', 'ok'); render();
     },
   });
 };
 ACTIONS.saveEditor = (_i, el) => {
-  const v = formOf(el); SETTINGS.editor_code = v.editor_code; saveSettings();
+  const v = formOf(el); SETTINGS.editor_code = v.editor_code; saveSettings(); if (typeof syncRolesOnly === 'function') syncRolesOnly();
   toast(v.editor_code ? nameOf(v.editor_code) + ' peut maintenant modifier les données.' : 'Seul le trésorier peut modifier les données.', 'ok'); render();
 };
 ACTIONS.userDel = (id) => confirmBox('Supprimer le compte', 'Supprimer le compte « ' + esc(id) + ' » ?', () => { delete USERS[id]; saveUsers(); render(); }, t('del'));

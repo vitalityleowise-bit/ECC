@@ -27,7 +27,7 @@ function backupName(ext, kind) {
 
 /* Enregistrement : localStorage + dossier natif (fichier courant + copie du jour) */
 let persistTimer = null;
-function markSaved() { store.rawSet(SAVED_AT_KEY, new Date().toISOString()); schedulePersist(); }
+function markSaved() { store.rawSet(SAVED_AT_KEY, new Date().toISOString()); schedulePersist(); if (typeof schedulePush === 'function' && SESSION) schedulePush(); }
 function schedulePersist() {
   if (!hasNative()) return;
   clearTimeout(persistTimer);

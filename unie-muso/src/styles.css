@@ -348,3 +348,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .profile-due { justify-content: center; }
   .profile-dl { grid-template-columns: 120px 1fr; }
 }
+/* Les colonnes ne dépassent jamais l'écran : le texte long passe à la ligne */
+.grid-2 > *, .grid-3 > *, .grid-2-1 > * { min-width: 0; }
+.dl dd { min-width: 0; overflow-wrap: anywhere; }
+.net-status { border: 0; cursor: pointer; margin-right: 8px; font-family: var(--f-body); }
+@media (max-width: 860px) { .net-status { font-size: 0; padding: 4px 7px; } .net-status::first-letter { font-size: 12px; } .topbar .crumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }

@@ -73,7 +73,7 @@ function saveDemande(d) {
   DB.demandes_pret.push({
     id: nextDemandeId(), code_membre: d.code, nom_membre: nameOf(d.code), date_demande: fmtD(d.date), montant_demande: num(d.montant), motif: d.motif.trim(),
     score_auto: sc.auto, max_auto: sc.bestMax, statut: 'En attente', date_decision: '', montant_approuve: 0, duree_approuvee: 0, grace_approuve: false,
-    commentaire_comite: '', membres_comite: '', pret_id: null,
+    commentaire_comite: '', membres_comite: '', pret_id: null, key: uid(),
     evaluation: { notes_comite: {} },
   });
   saveDB(); toast('Demande enregistrée. Elle sera évaluée par le comité.', 'ok'); render();

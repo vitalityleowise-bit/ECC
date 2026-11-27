@@ -12,6 +12,7 @@ function boot() {
   } catch (_e) { /* session ignorée */ }
   if (SESSION) STATE.page = currentRole() === 'membre' || currentRole() === 'comite' ? 'moncompte' : 'dashboard';
   render();
+  if (SESSION && typeof goOnline === 'function') goOnline();
   checkPendingImports();
   setInterval(checkAlarms, 30000); checkAlarms();
   // Une autre fenêtre ou l'application native a modifié les données

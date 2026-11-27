@@ -1,0 +1,56 @@
+UNIE-MUSO — Mettre l'application en ligne (synchronisation automatique)
+=======================================================================
+
+Le projet Firebase « unie-muso » est déjà créé. Voici les 6 étapes, dans l'ordre.
+
+ÉTAPE 1 — Vérifier la connexion par e-mail (une seule fois)
+  Firebase > Sécurité > Authentication > onglet « Méthode de connexion » :
+  « Adresse e-mail/Mot de passe » doit être « Activé ».
+
+ÉTAPE 2 — Installer les règles de sécurité (une seule fois)
+  1. Firebase > Bases de données et stockage > Firestore > onglet « Règles ».
+  2. Effacer tout le texte qui s'y trouve.
+  3. Coller TOUT le contenu du fichier « firestore.rules » (fourni avec ce guide).
+  4. Cliquer « Publier ».
+  Ces règles décident qui voit quoi : seuls les membres connus lisent les données,
+  seuls le trésorier et la personne autorisée modifient, chaque membre ne voit que
+  ses propres messages et demandes, le comité voit tout.
+
+ÉTAPE 3 — Changer le mot de passe « admin » (obligatoire)
+  Ouvrir la nouvelle version de l'application, se connecter avec « admin ».
+  Paramètres > Comptes de gestion > admin > Modifier : choisir un mot de passe
+  personnel (au moins 8 caractères, avec des chiffres). Tant que le mot de passe est
+  « admin », l'application refuse d'aller en ligne (trop facile à deviner).
+
+ÉTAPE 4 — Donner un mot de passe personnel à chaque membre (fortement conseillé)
+  Paramètres > Accès portail des membres > « Définir » pour chaque membre.
+  Un mot de passe égal au code (m001, m002…) est facile à deviner : en ligne,
+  quelqu'un pourrait se connecter à la place du membre.
+
+ÉTAPE 5 — Première synchronisation (avec Internet)
+  1. Toujours connecté en « admin », avec Internet : en haut de l'écran le voyant
+     passe à « ● En ligne ». Toutes les données sont envoyées au serveur.
+  2. Paramètres > En ligne > « Créer / mettre à jour les comptes des membres ».
+     Garder l'application ouverte jusqu'au message « N compte(s) créé(s) ».
+  À refaire après chaque changement de mot de passe, de poste au comité ou de la
+  personne autorisée à modifier.
+
+ÉTAPE 6 — Les membres
+  Chaque membre installe la nouvelle version (APK, fichier HTML ou, plus tard, le lien
+  en ligne) et se connecte avec son code (ex. M004) et son mot de passe.
+  Dès qu'il a Internet, il reçoit les données à jour ; ses messages, demandes de prêt
+  et suggestions arrivent au comité.
+
+VOYANT EN HAUT DE L'ÉCRAN
+  ● En ligne            tout est synchronisé
+  ⟳ Synchronisation…    envoi ou réception en cours
+  ○ Hors ligne          pas d'Internet : tout continue de marcher ; les changements
+                        partent automatiquement au retour d'Internet
+  ! Problème en ligne   toucher le voyant pour lire l'explication
+
+À SAVOIR
+  - Deux personnes peuvent modifier (trésorier + personne autorisée). Si elles modifient
+    la même liste en même temps hors ligne, la modification la plus récente gagne.
+  - Messages, annonces, suggestions et demandes de prêt sont enregistrés un par un :
+    plusieurs personnes peuvent écrire en même temps sans rien perdre.
+  - La formule gratuite « Spark » suffit largement pour 19 membres.
