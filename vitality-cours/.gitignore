@@ -28,3 +28,6 @@ backend/dist/
 # OS / editor
 .DS_Store
 *.log
+
+# ...but the template (no real secrets) is safe to commit
+!.env.example

@@ -17,11 +17,13 @@ function hasKey(name) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-// LLM goes live when a provider is selected. For OpenAI the key may be injected
-// by the proxy (this session) or set as OPENAI_API_KEY (a real server), so the
-// mode follows LLM_PROVIDER, not only the presence of a key.
+// LLM goes live when a provider is selected. The key may be injected by the
+// proxy (this session) or set in the environment (a real server), so the mode
+// follows LLM_PROVIDER, not only the presence of a key. Default: gemini (free,
+// no credit card).
 const llmProvider = (process.env.LLM_PROVIDER || '').toLowerCase();
-const llmLive = llmProvider === 'openai' || hasKey('LLM_API_KEY');
+const llmLive =
+  llmProvider === 'gemini' || llmProvider === 'openai' || hasKey('LLM_API_KEY');
 
 const mode = {
   llm: llmLive ? 'live' : 'mock',
@@ -42,8 +44,11 @@ async function runTutorTurn({ task, systemPrompt, learnerText }) {
       tip: 'Mock mode: set LLM_PROVIDER=openai and add a key to use the real tutor.',
     };
   }
-  if (llmProvider === 'openai' || llmProvider === '') {
-    // Default live provider is OpenAI.
+  if (llmProvider === 'gemini' || llmProvider === '') {
+    // Default live provider is Gemini (free tier, no credit card).
+    return require('./gemini').runTutorTurn({ task, systemPrompt, learnerText });
+  }
+  if (llmProvider === 'openai') {
     return require('./openai').runTutorTurn({ task, systemPrompt, learnerText });
   }
   throw new Error(`Unknown LLM provider: ${llmProvider}`);
