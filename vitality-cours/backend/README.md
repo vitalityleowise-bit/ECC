@@ -1,27 +1,44 @@
 # VITALITY COURS - Backend
 
-Thin server that holds every API key and streams audio/text between the app and
-the AI providers. The Flutter app never talks to an AI provider directly, so a
-stolen APK cannot leak keys or spend the owner's money. This is a hard rule.
+Thin, dependency-free Node server that holds every API key and connects the app
+to the AI providers. The Flutter app never talks to a provider directly, so a
+stolen APK cannot leak keys or spend the owner's money. Hard rule.
 
-## Responsibilities
+## Run it
 
-1. `POST /session` - start a tutor session for a (language, level, style) persona.
-2. `WS /conversation` - receive the learner's audio stream, run:
-   - streaming speech-to-text (STT),
-   - the tutor LLM (routed: cheap model for quick corrections, stronger model for
-     full conversation - see the cost-aware-llm-pipeline skill),
-   - streaming text-to-speech (TTS) back to the app.
-3. `POST /pronunciation` - send audio + expected text to the assessment API and
-   return per-word and per-phoneme scores. Scores are never invented by the LLM.
-4. Record usage so the owner can see cost per day.
+```bash
+cd backend
+npm start          # starts on http://localhost:8080
+npm test           # runs the test suite (no keys needed)
+```
 
-## Keys (never committed)
+With no keys set, every provider runs in **mock mode**: the whole app works for
+testing, but replies are fake. Add the owner's own keys in `.env` (see
+`../.env.example`) to go live.
 
-Copy `../.env.example` to `backend/.env` and fill in the owner's OWN keys. The
-real `.env` is git-ignored. Keys from any other app must never be used.
+## Endpoints
 
-## Not built yet
+| Method + path | What it does |
+|---|---|
+| `GET /health` | Status + which providers are live vs mock |
+| `POST /session` | Validate (language, level, style) and return the tutor prompt |
+| `POST /tutor-turn` | Run one tutor turn (routed LLM); mock-safe without keys |
+| `POST /pronunciation` | Pronunciation score per word |
 
-This folder is a placeholder. The server is implemented in a later step, after
-the owner creates the free accounts and provides the keys securely (not in chat).
+Streaming voice (STT in, TTS out over WebSocket) and the live provider adapters
+are the next step, added once the owner's keys are in place.
+
+## How "plizyè IA" works
+
+`src/router.js` routes each task to a tier: a small fast model for quick
+corrections, a standard model for conversation, a large model for detailed
+feedback. Swapping providers never changes this routing. See the
+cost-aware-llm-pipeline skill.
+
+## Files
+
+- `src/personaPrompt.js` - builds the tutor's hidden prompt from persona data
+- `src/router.js` - task -> model tier routing
+- `src/providers/index.js` - LLM / STT / TTS / pronunciation adapters (mock + live)
+- `src/server.js` - the HTTP server
+- `test/run.js` - tests (run with `npm test`)
