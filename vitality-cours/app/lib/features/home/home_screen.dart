@@ -57,7 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               (style) => _StyleCard(
                 style: style,
                 uiLang: uiLang,
-                onTap: () => _startConversation(style),
+                onTap: () => _startConversation(catalog, style),
               ),
             ),
           ],
@@ -66,13 +66,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _startConversation(ConversationStyle style) {
+  void _startConversation(PersonaCatalog catalog, ConversationStyle style) {
+    final level = catalog.levels.firstWhere(
+      (l) => l.id == _levelId,
+      orElse: () => catalog.levels.first,
+    );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ConversationScreen(
           style: style,
+          level: level,
           targetLanguage: _language,
-          levelId: _levelId,
         ),
       ),
     );

@@ -8,6 +8,7 @@ Plan sa a swiv skill `blueprint` la. Chak etap se yon ti moso ou ka teste.
 - **E1 - Stil konvèsasyon yo (done):** 6 stil × 3 nivo nan `personas.json`.
 - **E2 - Ekran prensipal:** chwazi lang (en/es/fr), nivo, stil.
 - **E3 - Ekran konvèsasyon (kokiy):** bouton mikwofòn, eta "m ap koute".
+- **E5a - Mikwofòn konekte:** peze-pou-pale anrejistre vwa, voye bay sèvè, montre repons + koreksyon + konsèy (toujou mòd mock pou STT).
 
 ## Etap ki vini 🔜
 
