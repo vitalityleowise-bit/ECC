@@ -14,8 +14,8 @@ ACTIONS.periodFrom = (_i, el) => { STATE.period = Object.assign({}, STATE.period
 ACTIONS.periodTo = (_i, el) => { STATE.period = Object.assign({}, STATE.period, { to: el.value }); render(); };
 ACTIONS.periodAll = () => { STATE.period = {}; render(); };
 ACTIONS.periodFiscal = () => {
-  const s = parseD(RULES.fiscal_start); const e = new Date(s.getFullYear() + 1, s.getMonth(), 0);
-  STATE.period = { from: toISO(s), to: toISO(e) }; render();
+  const r = fiscalRange(today());
+  STATE.period = { from: toISO(r.from), to: toISO(r.to) }; render();
 };
 function periodText() {
   const p = STATE.period || {};
@@ -85,14 +85,25 @@ PAGES.rapport = function () {
   const months = activityMonths();
   const key = STATE.rmonth || monthKey(today());
   const [y, m] = key.split('-').map(Number);
-  const from = new Date(y, m - 1, 1), to = new Date(y, m, 0);
+  const RR = reportRange(key); const from = RR.from, to = RR.to;
+  const monthSel = '<select data-change="rmonth">' + months.slice().reverse().map((k) => '<option value="' + k + '"' + (k === key ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>';
+  if (RR.invalid) {
+    const held = heldMeetingDates().some((d) => d.getTime() === RR.meet.getTime());
+    const q = held ? quorumInfo(RR.meet) : null;
+    const nextK = monthKey(new Date(y, m, 1));
+    const msg = held ? 'La réunion du ' + longDate(RR.meet) + ' n’a pas eu le quorum (' + q.pres + ' présents sur ' + q.N + ', ' + q.req + ' requis). Elle ne compte pas : les opérations de ' + monthLabel(key).toLowerCase() + ' sont présentées dans le rapport de ' + monthLabel(nextK).toLowerCase() + '.'
+      : 'Aucune réunion valide n’est enregistrée pour ' + monthLabel(key).toLowerCase() + ' (réunion prévue le ' + longDate(RR.meet) + '). Les opérations du mois seront présentées dans le rapport du mois suivant.';
+    window.__rapportResume = { key, invalid: true, msg };
+    return pageHead('Rapports', t('rapport'), '', monthSel) + '<div class="banner import"><span>' + esc(msg) + '</span>' +
+      (canEdit() ? '<div class="right"><button class="btn btn-sm" data-go="reunions">Réunions et quorum</button></div>' : '') + '</div>';
+  }
   const inM = (x) => { const d = parseD(x.date); return d >= from && d <= to; };
   const T = treasury(to); const F = financials(from, to);
   const cots = DB.cotisations.filter(inM);
   const meet = lastThursday(y, m - 1);
   const actifs = DB.members.filter((x) => x.statut !== 'Inactif').sort(sortByCode);
   const att = actifs.map((x) => ({ m: x, type: attendanceType(x.code, meet) }));
-  const heldMeeting = meetingDates().some((d) => d.getTime() === meet.getTime());
+  const heldMeeting = heldMeetingDates().some((d) => d.getTime() === meet.getTime());
   const absents = heldMeeting ? att.filter((a) => a.type === 'absence') : [];
   const retards = heldMeeting ? att.filter((a) => a.type === 'retard') : [];
   const am = DB.amendes_paid.filter(inM);
@@ -116,10 +127,10 @@ PAGES.rapport = function () {
   const dues = []; enCours.forEach((x) => loanSchedule(x).forEach((r) => { if (r.due >= from && r.due <= to) dues.push(r); }));
   const prevKey = monthKey(new Date(y, m - 2, 1));
   const prevCot = sum(DB.cotisations.filter((c) => monthKey(c.date) === prevKey), (c) => num(c.verte) + num(c.rouge));
-  window.__rapportResume = { key, ctx: { from, to, meet, heldMeeting, att, absents, retards, actifs, cots, totCot, am, rmb, pretsM, demM, enCours, dues, situ, enRetard, lateLoans, T, F, reco, prevKey, prevCot } };
+  window.__rapportResume = { key, ctx: { carried: RR.carried, from, to, meet, heldMeeting, att, absents, retards, actifs, cots, totCot, am, rmb, pretsM, demM, enCours, dues, situ, enRetard, lateLoans, T, F, reco, prevKey, prevCot } };
   const sec = (n, title, body) => '<h2>' + n + '. ' + esc(title) + '</h2>' + body;
-  return '<div class="no-print">' + pageHead('Rapports', t('rapport'), 'Modèle en 9 sections, prêt à imprimer ou enregistrer en PDF',
-    '<select data-change="rmonth">' + months.slice().reverse().map((k) => '<option value="' + k + '"' + (k === key ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
+  return '<div class="no-print">' + pageHead('Rapports', t('rapport'), 'Modèle en 9 sections, prêt à imprimer ou enregistrer en PDF' + (RR.carried.length ? ' · inclut les opérations de ' + RR.carried.map((k) => monthLabel(k).toLowerCase()).join(', ') + ' (sans réunion valide)' : ''),
+    monthSel +
     '<button class="btn btn-accent" data-act="rapportResume">Résumé du rapport</button><button class="btn btn-primary" onclick="window.print()">' + t('print') + ' / PDF</button>') + '</div>' +
     '<article class="report">' +
       '<div class="report-head">' + logoImg() + '<div><div class="t1">UNIE-MUSO</div><div class="t2">Unie Mutuelle Solidarité · Petit-Goâve, Haïti</div></div>' +
@@ -163,6 +174,7 @@ function resumeBlocks(r) {
   const actif = F.actif.filter((x) => x.v); const prod = F.produits.filter((x) => x.v); const chg = F.charges.filter((x) => x.v);
   const verteEpargne = (F.capitaux.find((x) => x.acc === 3010) || { v: 0 }).v;
   B.push({ h: '1. Situation générale' });
+  if (c.carried && c.carried.length) B.push({ p: 'Ce rapport présente aussi les opérations de ' + joinList(c.carried.map((k) => monthLabel(k).toLowerCase())) + ', mois sans réunion valide (pas de réunion ou pas de quorum), reportées conformément au règlement.' });
   B.push({ p: 'Au ' + fin + ', UNIE-MUSO compte ' + c.actifs.length + ' membres actifs sur ' + DB.members.length + ' inscrits. ' +
     (c.heldMeeting ? 'La réunion mensuelle du ' + longDate(c.meet) + ' a réuni ' + (c.att.length - c.absents.length) + ' membres sur ' + c.att.length + ', soit un taux de présence de ' + pct(c.att.length - c.absents.length, c.att.length) + ' %' +
       (c.absents.length ? ' ; ' + c.absents.length + ' membre(s) étaient absents (' + joinList(c.absents.map((x) => memberName(x.m))) + ')' : ' ; aucun membre n’était absent') +
@@ -233,6 +245,7 @@ function textToBlocks(txt) {
 function currentBlocks(r) { const c = customResume(r.key); return c ? textToBlocks(c) : resumeBlocks(r); }
 function resumeBody(r, withHead) {
   if (!r) return '';
+  if (r.invalid) return '<div class="banner import" style="margin:0"><span>' + esc(r.msg) + '</span></div>';
   const B = currentBlocks(r);
   // Les tableaux suivent le paragraphe de leur section
   const html = []; let pendingTable = null;
@@ -248,11 +261,13 @@ function resumeBody(r, withHead) {
     (withHead ? '<div class="sig"><div>' + esc(SETTINGS.sign_presidente) + '<br>Présidente</div><div>' + esc(SETTINGS.sign_tresorier) + '<br>Trésorier</div></div>' : '');
 }
 function resumeText(r) {
+  if (r.invalid) return 'UNIE-MUSO — ' + monthLabel(r.key) + '\n\n' + r.msg;
   return 'UNIE-MUSO — Résumé du rapport mensuel, ' + monthLabel(r.key) + '\n\n' +
     currentBlocks(r).filter((b) => !b.table).map((b) => (b.h ? '*' + b.h + '*' : b.p)).join('\n\n') + '\n\n' + SETTINGS.sign_tresorier + ', Trésorier';
 }
 ACTIONS.rapportResume = () => {
   const r = window.__rapportResume; if (!r) return;
+  if (r.invalid) { openModal({ title: 'Résumé du rapport — ' + monthLabel(r.key), body: resumeBody(r) }); return; }
   openModal({
     title: 'Résumé du rapport — ' + monthLabel(r.key), wide: true,
     body: '<div class="report" style="padding:20px 24px;border:0">' + resumeBody(r, true) + '</div>' +
@@ -349,7 +364,7 @@ function memberResumePanel() {
   const months = activityMonths().filter((k) => k <= monthKey(today())).reverse();
   return '<section class="panel"><div class="panel-head"><h2>Résumé du rapport mensuel</h2>' +
     '<div class="right"><select data-change="mrmonth" style="padding:4px 6px;border:1px solid var(--line);border-radius:5px">' + months.map((k) => '<option value="' + k + '"' + (k === key ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
-    '<button class="btn btn-sm" data-act="mrOpen">Plein écran</button><button class="btn btn-sm btn-primary" data-act="mrFull">Rapport complet</button></div></div>' +
+    '<button class="btn btn-sm" data-act="mrOpen">Plein écran</button>' + (canSee('rapport') ? '<button class="btn btn-sm btn-primary" data-act="mrFull">Rapport complet</button>' : '') + '</div></div>' +
     '<div class="panel-body" style="max-height:420px;overflow-y:auto">' + resumeBody(r, false) + '</div></section>';
 }
 ACTIONS.mrmonth = (_i, el) => { STATE.mrmonth = el.value; render(); };
@@ -371,14 +386,14 @@ PAGES.moncompte = function () {
       return '<tr><td class="code">#' + d.id + '</td><td>' + esc(nameOf(d.code_membre)) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + (n === undefined ? '<span class="badge b-orange">à donner</span>' : '<b class="num">' + fmt(n) + '/' + GRILLE.pts_comite + '</b>') + '</td>' +
         '<td class="act"><button class="btn btn-sm btn-accent" data-act="demEval" data-id="' + d.id + '">' + (n === undefined ? 'Donner ma note' : 'Voir / modifier') + '</button></td></tr>';
     })), { flush: true }) : '') +
-    memberResumePanel() +
+    memberResumePanel() + memberCommPanel(m) +
     '<div class="kpis">' + kpi('Caisse Verte', fmt(s.verte) + ' <small>HTG</small>', 'mon épargne', 'green') + kpi('Caisse Rouge', fmt(s.rouge) + ' <small>HTG</small>', 'solidarité', 'red') +
       kpi('Total versé', fmt(s.total) + ' <small>HTG</small>', '', 'navy') + kpi('Reste dû', fmt(s.reste) + ' <small>HTG</small>', s.statut, s.reste ? 'orange' : 'green') + '</div>' +
     '<div class="grid-2"><div>' +
       panel('Situation à ce jour', '<dl class="dl">' +
         '<dt>Mois dus</dt><dd class="num">' + RULES.nb_cotisations_attendues + ' × ' + fmt(COT()) + '</dd><dt>Attendu</dt><dd class="num">' + money(s.attendu) + '</dd>' +
         '<dt>Versé</dt><dd class="num">' + money(s.total) + '</dd><dt>Retard</dt><dd class="num">' + money(s.reste) + '</dd>' +
-        '<dt>Amendes dues</dt><dd class="num">' + money(s.amendesDues) + '</dd><dt>Cotisation du mois</dt><dd class="num">' + money(s.cotMois) + '</dd>' +
+        '<dt>Amendes dues</dt><dd class="num">' + money(s.amendesDues) + cotLateDetail(s) + '</dd><dt>Cotisation du mois</dt><dd class="num">' + money(s.cotMois) + '</dd>' +
         (s.loanDue ? '<dt>Mensualité de prêt</dt><dd class="num">' + money(s.loanDue.du) + '</dd>' : '') +
         '<dt><b>Total à verser</b></dt><dd class="num"><b style="color:var(--orange)">' + money(s.totalAVerser) + '</b></dd></dl>', { meta: 'prochaine réunion' }) +
       panel('Présences aux réunions', attendanceSummary(s)) +
@@ -389,7 +404,7 @@ PAGES.moncompte = function () {
     '</div><div>' +
       panel('Mes demandes de prêt', table(['N°', 'Date', ['Montant', 'n'], 'Statut'], mesDem.map((d) => '<tr><td class="code">#' + d.id + '</td><td class="num">' + esc(d.date_demande) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + statusBadge(d.statut) +
         (d.statut === 'Approuvée' ? ' <span class="muted num">' + fmt(d.montant_approuve) + '</span>' : '') + (d.commentaire_comite ? '<div class="muted" style="font-size:11px">' + esc(d.commentaire_comite) + '</div>' : '') + '</td></tr>')),
-        { flush: true, right: '<button class="btn btn-sm btn-primary" data-act="demNew" data-id="self">Faire une nouvelle demande</button>' }) +
+        { flush: true, right: s.loan ? '<span class="muted" style="font-size:11.5px">Prêt en cours : nouvelle demande possible après remboursement</span>' : '<button class="btn btn-sm btn-primary" data-act="demNew" data-id="self">Faire une nouvelle demande</button>' }) +
       panel('Prêt en cours', s.loan ? '<dl class="dl" style="margin-bottom:10px"><dt>Capital</dt><dd class="num">' + money(s.loan.capital) + '</dd><dt>Remboursé</dt><dd class="num">' + money(lt.rembourse) + '</dd><dt>Reste</dt><dd class="num">' + money(lt.reste) + '</dd></dl>' + scheduleTable(s.loan, false) : '<span class="muted">Aucun prêt en cours.</span>') +
       panel('Historique des cotisations', table(['Date', ['Verte', 'n'], ['Rouge', 'n'], 'Mode'], s.cots.slice().sort((a, b) => parseD(b.date) - parseD(a.date)).map((c) =>
         '<tr><td class="num">' + esc(c.date) + '</td><td class="n">' + fmt(c.verte) + '</td><td class="n">' + fmt(c.rouge) + '</td><td>' + esc(c.mode) + '</td></tr>')), { flush: true }) +
@@ -407,7 +422,7 @@ PAGES.sauvegarde = function () {
       : '<div class="banner import"><span>Version navigateur : les données restent dans ce navigateur. Exportez régulièrement une sauvegarde, ou utilisez l’application Android / Windows qui enregistre automatiquement dans un dossier.</span></div>') +
     '<div class="grid-2">' +
       panel('Partager avec les membres', '<p style="margin-top:0">Fichier <b>.unimiso</b> à envoyer sur WhatsApp. Le membre touche le fichier : l’application UNIE-MUSO s’ouvre et importe les données.</p>' +
-        '<p class="muted">Ce fichier ne contient <b>pas</b> les comptes administrateur et caissier.</p>' +
+        '<p class="muted">Ce fichier ne contient <b>pas</b> le compte administrateur.</p>' +
         '<button class="btn btn-accent" data-act="shareMembers">Partager (WhatsApp…)</button> <button class="btn" data-act="saveMembers">Enregistrer le fichier</button>') +
       panel('Sauvegarde complète', '<p style="margin-top:0">Toutes les données, y compris les comptes de gestion. À garder pour vous (clé USB, Google Drive, e-mail).</p>' +
         '<button class="btn btn-primary" data-act="exportJson">Exporter en JSON</button> <button class="btn" data-act="exportUnimiso">Exporter en .unimiso</button>') +
@@ -431,7 +446,7 @@ PAGES.parametres = function () {
   if (tab === 'general') {
     body = '<form data-form="general" class="panel"><div class="panel-body"><div class="form-grid">' +
       field('Langue / Lang', select('lang', [{ v: 'fr', l: 'Français' }, { v: 'kr', l: 'Kreyòl' }], SETTINGS.lang)) +
-      field('Début de l’exercice comptable', input('fiscal_start', RULES.fiscal_start, 'type="date"'), '', 'Exercice actuel : ' + esc(fiscalLabel()) + ' (règlement chap. IX art. 46 : 1er octobre → 30 septembre).') +
+      field('Début de l’exercice comptable', input('fiscal_start', RULES.fiscal_start, 'type="date"'), '', 'Exercice actuel : ' + esc(fiscalLabel()) + '. Exercice de la mutuelle : 1er avril → 31 mars (indépendant de l’exercice fiscal haïtien).') +
       field('Démarrage de la mutuelle', input('mutuelle_start', RULES.mutuelle_start, 'type="date"')) +
       field('Heure de la réunion', input('meeting_hour', SETTINGS.meeting_hour, 'type="time"'), '', 'Dernier jeudi du mois.') +
       field('Signature — Présidente', input('sign_presidente', SETTINGS.sign_presidente)) + field('Signature — Trésorier', input('sign_tresorier', SETTINGS.sign_tresorier)) +
@@ -464,7 +479,11 @@ PAGES.parametres = function () {
     body = '<section class="panel"><div class="toolbar"><button class="btn btn-sm btn-primary" data-act="userEdit">Ajouter un compte</button></div>' +
       table(['Identifiant', 'Nom complet', 'Fonction', 'Rôle', ''], Object.keys(USERS).map((k) => '<tr><td class="code">' + esc(k) + '</td><td>' + esc(USERS[k].fullname) + '</td><td>' + esc(USERS[k].position || '') + '</td><td>' + esc(USERS[k].role) + '</td>' +
         '<td class="act"><button class="btn btn-sm" data-act="userEdit" data-id="' + esc(k) + '">' + t('edit') + '</button>' + (k !== SESSION.id ? '<button class="btn btn-sm btn-danger" data-act="userDel" data-id="' + esc(k) + '">' + t('del') + '</button>' : '') + '</td></tr>')) +
-      '<div class="section-note">Changez les mots de passe « admin » et « caissier » par défaut. Ces comptes ne sont jamais inclus dans le fichier partagé avec les membres.</div></section>';
+      '<div class="section-note">Changez le mot de passe « admin » par défaut. Ce compte n’est jamais inclus dans le fichier partagé avec les membres.</div></section>' +
+      '<form class="panel"><div class="panel-head"><h2>Deuxième personne autorisée à modifier</h2></div><div class="panel-body">' +
+      '<p style="margin-top:0">Seules deux personnes peuvent modifier les données : le trésorier (compte admin) et le membre du comité choisi ici. Il se connecte avec son code membre et son mot de passe du portail.</p>' +
+      field('Membre du comité', select('editor_code', [{ v: '', l: 'Personne (trésorier seul)' }].concat(DB.members.filter((m) => m.is_comite).sort(sortByCode).map((m) => ({ v: m.code, l: m.code + ' — ' + memberName(m) + (m.comite_poste ? ' (' + m.comite_poste + ')' : '') }))), SETTINGS.editor_code || '')) +
+      '</div><div class="modal-foot"><button class="btn btn-primary" data-act="saveEditor">' + t('save') + '</button></div></form>';
   } else {
     body = '<form class="panel"><div class="panel-body"><p style="margin-top:0">Rappels le jour de la réunion (dernier jeudi du mois, ' + esc(SETTINGS.meeting_hour) + '). Sur Android et Windows, les rappels s’affichent même si l’application est fermée' + (hasNative() ? '' : ' ; dans un navigateur, seulement si la page est ouverte') + '.</p>' +
       SETTINGS.alarmes.map((a, i) => '<div class="form-grid" style="grid-template-columns:120px 160px 1fr;margin-bottom:8px;align-items:end">' +
@@ -508,10 +527,10 @@ ACTIONS.defaultPwds = () => {
   saveDB(); toast(n + ' mot(s) de passe généré(s).', 'ok'); render();
 };
 ACTIONS.userEdit = (id) => {
-  const u = id ? USERS[id] : { role: 'caissier', fullname: '', position: '', pwd: '' };
+  const u = id ? USERS[id] : { role: 'admin', fullname: '', position: '', pwd: '' };
   openModal({
     title: id ? 'Compte ' + id : 'Nouveau compte', submit: t('save'),
-    body: '<div class="form-grid">' + field('Identifiant', input('id', id || '', id ? 'readonly' : 'required autocapitalize="off"')) + field('Rôle', select('role', [{ v: 'admin', l: 'Administrateur' }, { v: 'caissier', l: 'Caissier' }], u.role)) +
+    body: '<div class="form-grid">' + field('Identifiant', input('id', id || '', id ? 'readonly' : 'required autocapitalize="off"')) + field('Rôle', select('role', [{ v: 'admin', l: 'Administrateur' }], 'admin')) +
       field('Nom complet', input('fullname', u.fullname)) + field('Fonction', input('position', u.position)) +
       field('Membre correspondant', select('member_code', [{ v: '', l: 'Aucun' }].concat(memberOptions()), u.member_code || ''), '', 'Empêche cette personne de noter ou décider sa propre demande de crédit.') +
       field('Mot de passe', input('pwd', u.pwd, 'required autocapitalize="off"')) + '</div>',
@@ -523,6 +542,10 @@ ACTIONS.userEdit = (id) => {
       USERS[k] = { pwd: v.pwd, role: v.role, fullname: v.fullname, position: v.position, member_code: v.member_code }; saveUsers(); toast('Compte enregistré.', 'ok'); render();
     },
   });
+};
+ACTIONS.saveEditor = (_i, el) => {
+  const v = formOf(el); SETTINGS.editor_code = v.editor_code; saveSettings();
+  toast(v.editor_code ? nameOf(v.editor_code) + ' peut maintenant modifier les données.' : 'Seul le trésorier peut modifier les données.', 'ok'); render();
 };
 ACTIONS.userDel = (id) => confirmBox('Supprimer le compte', 'Supprimer le compte « ' + esc(id) + ' » ?', () => { delete USERS[id]; saveUsers(); render(); }, t('del'));
 function readAlarmForm(el) {

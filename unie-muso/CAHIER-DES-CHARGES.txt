@@ -81,3 +81,29 @@ H. FICHE DE DÉPÔT ENVOYÉE PAR LE MEMBRE (validation MANUELLE par le trésorie
       avec un motif). La photo peut être jointe comme pièce justificative.
    4. Le membre voit l'état de ses fiches : envoyée, traitée, refusée.
    Dépend de la version en ligne (A) pour que la fiche arrive chez le trésorier.
+
+I. DEMANDES DU 27/11/2026
+   FAIT (version 3.3) :
+   - Amende de cotisation ajoutée pour chaque mois non payé à temps (détail des mois affiché).
+   - Exercice de la mutuelle : 1er avril → 31 mars.
+   - Onglet « Réunions et quorum » : quorum = 50 % + 1 des membres actifs (18 → 10),
+     lien vers la liste de présence, décision manuelle possible, réunions programmées.
+   - Sans quorum (ou sans réunion) : la réunion ne compte pas (ni retard, ni absence)
+     et les opérations passent au rapport du mois suivant (ex. juillet → août).
+   - Un membre peut cotiser sans être présent : la feuille de présence fait foi.
+   - Nouvelle police (Plus Jakarta Sans), embarquée hors ligne.
+   - Caisse Bleue (dons, subventions).
+   - Suppression d'une demande de prêt.
+   - Note de 0 à 50 : aucun montant maximum.
+   - Dépenses : bénéficiaire choisi dans la liste des membres, filtre et saisie par mois ;
+     Statistiques : dépenses par mois.
+   - Caisse à zéro (tout l'argent à la banque).
+   - Deux personnes seulement modifient : le trésorier (admin) et un membre du comité
+     choisi dans Paramètres (Présidente par défaut). Compte « caissier » supprimé.
+   - Un membre qui a un prêt en cours ne peut pas faire de nouvelle demande.
+   - Les membres hors comité voient seulement le résumé du rapport (Mon compte).
+   - Messagerie membres ↔ comité (qui a envoyé, qui a répondu) et boîte à suggestions.
+   - Écran de bienvenue avec le logo après la connexion.
+   EN ATTENTE DU FICHIER EXCEL DU TRÉSORIER :
+   - Plan comptable de la mutuelle (les comptes de produits ne doivent pas être en capital),
+     ordre des comptes dans tous les états financiers, compte de la Caisse Bleue.

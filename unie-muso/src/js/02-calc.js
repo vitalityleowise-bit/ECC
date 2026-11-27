@@ -7,12 +7,41 @@ const CASH = 'Liquidité';
 function isBank(mode) { return mode !== CASH; }
 
 /* Dates de réunion « réelles » : jours où au moins une cotisation ou une absence a été saisie */
-function meetingDates() {
+/* Cache des calculs de réunions (vidé à chaque enregistrement et à chaque affichage) */
+let CALC = {};
+function resetCalc() { CALC = {}; }
+/* Réunions tenues : cotisations le dernier jeudi, feuille de présence saisie, ou réunion programmée passée avec feuille */
+function heldMeetingDates() {
+  if (CALC.held) return CALC.held;
   const set = new Set();
   DB.cotisations.forEach((c) => { const d = parseD(c.date); if (d && d.getTime() === lastThursdayOf(d).getTime()) set.add(fmtD(d)); });
   DB.absences.forEach((a) => set.add(fmtD(a.date)));
-  return [...set].map(parseD).filter((d) => d && d <= today()).sort((a, b) => a - b);
+  (DB.reunions || []).forEach((r) => { if (r.type !== 'comite' && sheetExists(r.date)) set.add(fmtD(r.date)); });
+  CALC.held = [...set].map(parseD).filter((d) => d && d <= today()).sort((a, b) => a - b);
+  return CALC.held;
 }
+/* Réunions VALIDES : tenues ET avec le quorum (50 % + 1 des membres actifs, représentés compris).
+   Sans quorum, la réunion ne compte pas (ni retard, ni absence) et ses opérations passent au mois suivant. */
+function meetingDates() {
+  if (CALC.valid) return CALC.valid;
+  CALC.valid = heldMeetingDates().filter((d) => quorumInfo(d).reached);
+  return CALC.valid;
+}
+function membersActiveAt(date) {
+  return DB.members.filter((m) => m.statut !== 'Inactif' && (!parseD(m.date_adhesion) || parseD(m.date_adhesion) <= date));
+}
+function reunionInfo(date) { const k = fmtD(date); return (DB.reunions || []).find((r) => fmtD(r.date) === k && r.type !== 'comite') || null; }
+function sheetExists(date) { const k = fmtD(date); return DB.absences.some((a) => fmtD(a.date) === k && a.type); }
+function quorumInfo(date) {
+  const k = 'q' + fmtD(date); if (CALC[k]) return CALC[k];
+  const mem = membersActiveAt(date); const N = mem.length; const req = Math.floor(N / 2) + 1;
+  const pres = mem.filter((m) => attendanceType(m.code, date) !== 'absence').length;
+  const info = reunionInfo(date); const forced = info && info.quorum && info.quorum !== 'auto' ? info.quorum === 'oui' : null;
+  CALC[k] = { N, req, pres, reached: forced === null ? pres >= req : forced, forced: forced !== null, sheet: sheetExists(date) };
+  return CALC[k];
+}
+/* Le mois a-t-il eu une réunion valide ? */
+function validMeetingMonth(key) { return meetingDates().some((d) => monthKey(d) === key); }
 /* Pointage d'une réunion : présent | retard | represente | absence.
    Saisie manuelle (feuille de présence) prioritaire ; sinon présent si une cotisation est enregistrée ce jour-là. */
 const ATT_TYPES = [
@@ -25,6 +54,9 @@ function attendanceRecord(code, date) {
 function attendanceType(code, date, cots) {
   const rec = attendanceRecord(code, date);
   if (rec) return rec.type || 'absence';
+  // Une feuille de présence existe : seul le pointage compte (on peut cotiser sans être présent)
+  if (sheetExists(date)) return 'absence';
+  // Sans feuille (anciennes réunions) : présence estimée d'après la cotisation du jour
   const k = fmtD(date);
   return (cots || DB.cotisations).some((c) => c.code === code && fmtD(c.date) === k) ? 'present' : 'absence';
 }
@@ -200,7 +232,7 @@ function creditScore(code, asOf) {
   const base = s.verte; // cotisations Caisse Verte à jour
   const best = seuilFor(auto + num(GRILLE.pts_comite));
   return { auto, autoMax, pres, cot, cred, base, stats: s, hasLoan: !!s.loan,
-    bestSeuil: best, bestMax: Math.round(base * num(best.mult)) };
+    bestSeuil: best, bestMax: best.eligible ? Math.round(base * num(best.mult)) : 0 };
 }
 /* Évaluation complète d'une demande : automatique + moyenne des notes des membres du comité */
 function comiteMembers() { return DB.members.filter((m) => m.is_comite && m.statut !== 'Inactif').sort(sortByCode); }
@@ -216,14 +248,14 @@ function evaluateDemande(d) {
   const appreciation = notes.length ? round2(sum(notes, (n) => n.note) / notes.length) : null;
   const total = round2(pres + cot + cred + (appreciation || 0));
   const seuil = appreciation === null ? null : seuilFor(total);
-  const montant = seuil ? Math.round(sc.base * num(seuil.mult)) : null;
+  const montant = seuil ? (seuil.eligible ? Math.round(sc.base * num(seuil.mult)) : 0) : null;
   return { sc, pres, cot, cred, notes, appreciation, total, seuil, montant, complete: appreciation !== null, nbComite: graders.length, graders };
 }
 
 /* ---------- Comptabilité : plan comptable et journal ---------- */
 const ACCOUNTS = {
   1010: 'Encaisse (liquidité)', 1020: 'Banque CAP-AIDER', 1210: 'Prêts aux membres',
-  3010: 'CAISSE VERTE — épargne des membres', 3090: 'Résultat de l’exercice',
+  3010: 'CAISSE VERTE — épargne des membres', 3020: 'CAISSE BLEUE — dons et subventions', 3090: 'Résultat de l’exercice',
   4010: 'Frais d’inscription', 4020: 'Cotisations Caisse Rouge', 4030: 'Amendes',
   4040: 'Intérêts sur prêts', 4050: 'Pénalités sur prêts',
   5010: 'Frais administratifs', 5020: 'CAISSE ROUGE — solidarité / secours', 5030: 'Frais bancaires CAP-AIDER',
@@ -258,6 +290,8 @@ function buildJournal() {
     (p.payments || []).forEach((x) => add(x.date, 'RMB-' + p.id + '-' + x.n, 'Remboursement prêt #' + p.id + ' éch. ' + x.n + ' — ' + p.code_membre, [
       { acc: cashAcc(x.mode), d: x.montant }, { acc: 1210, c: x.cap }, { acc: 4040, c: x.int }, { acc: 4050, c: x.pen }], 'rmb'));
   });
+  (DB.dons || []).forEach((d, i) => add(d.date, 'DON-' + (i + 1), 'Caisse Bleue — ' + (d.nature || 'Don') + ' de ' + (d.donateur || ''),
+    [{ acc: cashAcc(d.mode || BANK), d: d.montant }, { acc: 3020, c: d.montant }], 'don'));
   DB.transferts.forEach((t, i) => {
     const toBank = t.sens !== 'retrait';
     add(t.date, 'TRF-' + (i + 1), toBank ? 'Dépôt de la caisse à la banque' : 'Retrait de la banque vers la caisse',
@@ -291,7 +325,7 @@ function financials(from, to) {
   const totPcum = sum(produits, (x) => x.cum), totCcum = sum(charges, (x) => x.cum);
   const actif = [1010, 1020, 1210].map((a) => ({ acc: a, v: solde(B, a) }));
   const passif = accs.filter((a) => accClass(a) === 2).map((a) => ({ acc: a, v: -solde(B, a) }));
-  const capitaux = [{ acc: 3010, v: -solde(B, 3010) }, { acc: 3090, v: totPcum - totCcum }];
+  const capitaux = [{ acc: 3010, v: -solde(B, 3010) }].concat(B[3020] ? [{ acc: 3020, v: -solde(B, 3020) }] : []).concat([{ acc: 3090, v: totPcum - totCcum }]);
   return { J, B, produits, charges, totP, totC, resultat: totP - totC, resultatCum: totPcum - totCcum, actif, passif, capitaux,
     totActif: sum(actif, (x) => x.v), totPassif: sum(passif, (x) => x.v) + sum(capitaux, (x) => x.v) };
 }
@@ -310,7 +344,8 @@ function treasury(asOf) {
   // Caisse Verte (statuts art. 25.1) : cotisations vertes + amendes, intérêts, pénalités, frais d'inscription
   const verteFonds = verteCot + produitsVerte - depVerte;
   const rougeFonds = rougeCot - depRouge;
-  return { caisse, banque, prets, actif: caisse + banque + prets, verteFonds, verteDispo: verteFonds - prets, rougeFonds, verteCot, rougeCot, depRouge, depVerte };
+  const bleueFonds = -solde(B, 3020);
+  return { caisse, banque, prets, actif: caisse + banque + prets, verteFonds, verteDispo: verteFonds - prets, rougeFonds, bleueFonds, verteCot, rougeCot, depRouge, depVerte };
 }
 function monthsRange(fromKey, toKey) {
   const out = []; let [y, m] = fromKey.split('-').map(Number); const [ty, tm] = toKey.split('-').map(Number);

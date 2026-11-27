@@ -31,7 +31,6 @@ const GENERIC_SEED = {
 const SEED_DATA = (typeof PRIVATE_SEED !== 'undefined' && PRIVATE_SEED) ? PRIVATE_SEED : GENERIC_SEED;
 const DEFAULT_USERS = {
   admin: { pwd: 'admin', role: 'admin', fullname: 'PATRICE MICHELET R. LEONARDO', position: 'Trésorier', member_code: 'M011' },
-  caissier: { pwd: 'caissier', role: 'caissier', fullname: 'Caissier', position: 'Caissier' },
 };
 /* Montants des amendes : Règlement interne UNIE-MUSO (modifiables par le trésorier dans Paramètres)
    Absence non motivée 50 HTG · retard non motivé 25 HTG (chap. IV art. 4 et résolutions)
@@ -42,7 +41,7 @@ const DEFAULT_RULES = {
   amende_absence: 50, amende_retard_reunion: 25, amende_cot_retard: 50,
   frais_recherche: 250, carnet_perdu: 500, carnet_abime: 250,
   penalite_pret_pct: 2,
-  mutuelle_start: '2026-04-01', nb_cotisations_attendues: 7, fiscal_start: '2026-10-01',
+  mutuelle_start: '2026-04-01', nb_cotisations_attendues: 7, fiscal_start: '2026-04-01',
   // anciens paramètres en pourcentage, conservés pour compatibilité des sauvegardes
   amende_absence_pct: 10, amende_retard_pct: 5,
 };
@@ -59,6 +58,7 @@ const AMENDE_TYPES = [
 function migrateRules(r) {
   const out = Object.assign(clone(DEFAULT_RULES), r || {});
   if (r && r.amende_absence === undefined) out.penalite_pret_pct = DEFAULT_RULES.penalite_pret_pct;
+  if (r && !r.fiscal_april) { out.fiscal_start = DEFAULT_RULES.fiscal_start; out.fiscal_april = true; }
   return out;
 }
 /* Grille d'évaluation de demande de crédit UNIE-MUSO (document officiel) :
@@ -68,7 +68,7 @@ function migrateRules(r) {
    4. Appréciation du comité ....................... 20 pts (moyenne des notes des membres du comité) */
 const DEFAULT_GRILLE = {
   seuils: [
-    { min: 0, max: 50, eligible: false, mult: 1, label: 'Refusé', regle: 'Équivalent des cotisations mensuelles du membre' },
+    { min: 0, max: 50, eligible: false, mult: 0, label: 'Refusé', regle: 'Non éligible : aucun montant' },
     { min: 51, max: 60, eligible: true, mult: 1.5, label: 'Passable', regle: '1,5 fois les cotisations mensuelles à jour' },
     { min: 61, max: 70, eligible: true, mult: 2, label: 'Assez bien', regle: '2 fois les cotisations mensuelles à jour' },
     { min: 71, max: 89, eligible: true, mult: 2.5, label: 'Bien', regle: '2,5 fois les cotisations mensuelles à jour' },
@@ -87,6 +87,7 @@ const DEFAULT_SETTINGS = {
     { min: 0, on: true, label: 'À l’heure' },
   ],
   meeting_hour: '17:00',
+  editor_code: 'M004', // 2e personne autorisée à modifier (membre du comité choisi par le trésorier)
   sign_presidente: 'Mme VALLON Rose Abigail',
   sign_tresorier: 'PATRICE MICHELET RICHEMOND LEONARDO',
   notif_asked: false,
@@ -111,7 +112,7 @@ function clone(o) { return o === undefined ? undefined : JSON.parse(JSON.stringi
 let DB, USERS, RULES, GRILLE, SETTINGS, DOCS;
 function normalizeDB(d) {
   d = d || {};
-  ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'demandes_pret', 'transferts']
+  ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'demandes_pret', 'transferts', 'reunions', 'dons', 'messages', 'suggestions']
     .forEach((k) => { if (!Array.isArray(d[k])) d[k] = []; });
   d.members.forEach((m) => {
     ['can_see_documents', 'comite_see_demandes', 'comite_see_compta', 'comite_see_reports'].forEach((k) => {
@@ -127,6 +128,8 @@ function loadAll() {
   USERS = store.get(KEYS.users, DEFAULT_USERS);
   // Anciennes sauvegardes : relie le compte admin du trésorier à sa fiche membre (conflit d'intérêts sur ses propres crédits)
   if (USERS.admin && USERS.admin.member_code === undefined && /PATRICE/i.test(USERS.admin.fullname || '')) USERS.admin.member_code = 'M011';
+  // Plus de compte « caissier » : seuls le trésorier (admin) et un membre du comité choisi peuvent modifier
+  Object.keys(USERS).forEach((k) => { if (USERS[k].role === 'caissier') delete USERS[k]; });
   RULES = migrateRules(store.get(KEYS.rules, null));
   GRILLE = migrateGrille(store.get(KEYS.grille, DEFAULT_GRILLE));
   SETTINGS = Object.assign(clone(DEFAULT_SETTINGS), store.get(KEYS.settings, DEFAULT_SETTINGS));
@@ -135,9 +138,12 @@ function loadAll() {
 /* Une ancienne grille (pondérations 40/30/20/10) est remplacée par la grille officielle */
 function migrateGrille(g) {
   if (!g || typeof g.pts_presence !== 'number') return clone(DEFAULT_GRILLE);
-  return Object.assign(clone(DEFAULT_GRILLE), g);
+  const out = Object.assign(clone(DEFAULT_GRILLE), g);
+  // 0 à 50 : refusé, aucun montant maximum
+  if (out.seuils[0] && !out.seuils[0].eligible) { out.seuils[0].mult = 0; out.seuils[0].regle = 'Non éligible : aucun montant'; }
+  return out;
 }
-function saveDB() { return store.set(KEYS.db, DB); }
+function saveDB() { if (typeof resetCalc === 'function') resetCalc(); return store.set(KEYS.db, DB); }
 function saveUsers() { store.set(KEYS.users, USERS); }
 function saveRules() { store.set(KEYS.rules, RULES); }
 function saveGrille() { store.set(KEYS.grille, GRILLE); }

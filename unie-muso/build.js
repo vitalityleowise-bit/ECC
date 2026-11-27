@@ -23,7 +23,14 @@ const js = ['/* UNIE-MUSO — application autonome hors ligne */', 'const EMBEDD
   .concat(jsFiles.map((f) => '/* ---- ' + f + ' ---- */\n' + fs.readFileSync(path.join(src, 'js', f), 'utf8')))
   .join('\n');
 // Le JS est enveloppé pour isoler la portée tout en gardant les fonctions globales utilisées par les attributs onclick
+// Police Plus Jakarta Sans (licence OFL) embarquée en base64
+const fontDir = path.join(root, 'assets', 'fonts');
+const fonts = [400, 600, 700, 800].map((w) => {
+  const f = path.join(fontDir, 'plus-jakarta-sans-latin-' + w + '-normal.woff2');
+  return fs.existsSync(f) ? "@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:" + w + ";font-display:swap;src:url(data:font/woff2;base64," + fs.readFileSync(f).toString('base64') + ") format('woff2');}" : '';
+}).join('\n');
 const html = fs.readFileSync(path.join(src, 'index.html'), 'utf8')
+  .split('__FONTS__').join(fonts)
   .split('__CSS__').join(css)
   .split('__LOGO__').join(logo)
   .split('__JS__').join(js.replace(/<\/script/gi, '<\\/script'));

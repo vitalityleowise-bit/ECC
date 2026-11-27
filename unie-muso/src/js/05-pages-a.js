@@ -98,15 +98,24 @@ PAGES.dashboard = function () {
           '<dt>Caisse Verte</dt><dd class="num">' + money(T.verteFonds) + '</dd>' +
           '<dt>— prêtée</dt><dd class="num">' + money(T.prets) + '</dd>' +
           '<dt>— disponible</dt><dd class="num">' + money(T.verteDispo) + '</dd>' +
-          '<dt>Caisse Rouge</dt><dd class="num">' + money(T.rougeFonds) + '</dd></dl>') +
+          '<dt>Caisse Rouge</dt><dd class="num">' + money(T.rougeFonds) + '</dd>' +
+          '<dt>Caisse Bleue</dt><dd class="num">' + money(T.bleueFonds) + '</dd></dl>') +
       '</div>' +
     '</div>' +
     panel('Activité récente', table(['Date', 'Pièce', 'Libellé', ['Montant', 'n']], recent.map((e) =>
       '<tr><td class="num">' + fmtD(e.date) + '</td><td class="code">' + esc(e.piece) + '</td><td>' + esc(e.lib) + '</td><td class="n">' + fmt(sum(e.lines, (l) => l.d)) + '</td></tr>')), { flush: true });
 };
-function fiscalLabel() {
-  const s = parseD(RULES.fiscal_start) || new Date(2026, 9, 1);
-  return MOIS[s.getMonth()].slice(0, 3) + '. ' + s.getFullYear() + ' → ' + MOIS[(s.getMonth() + 11) % 12].slice(0, 4) + '. ' + (s.getFullYear() + 1);
+/* Exercice de la mutuelle : 1er avril → 31 mars (jour/mois de début repris des Paramètres) */
+function fiscalRange(d) {
+  const ref = parseD(RULES.fiscal_start) || new Date(2026, 3, 1); d = parseD(d) || today();
+  let y = d.getFullYear();
+  if (d < new Date(y, ref.getMonth(), ref.getDate())) y--;
+  const from = new Date(y, ref.getMonth(), ref.getDate());
+  return { from, to: new Date(y + 1, ref.getMonth(), ref.getDate() - 1) };
+}
+function fiscalLabel(d) {
+  const r = fiscalRange(d);
+  return r.from.getDate() + ' ' + MOIS[r.from.getMonth()] + ' ' + r.from.getFullYear() + ' → ' + r.to.getDate() + ' ' + MOIS[r.to.getMonth()] + ' ' + r.to.getFullYear();
 }
 
 /* ---------- Membres ---------- */
@@ -149,12 +158,16 @@ function memberSheet(code) {
         '<tr><td>Total</td><td class="n">' + fmt(s.verte) + '</td><td class="n">' + fmt(s.rouge) + '</td><td class="n">' + fmt(s.total) + '</td><td></td></tr>'), { flush: true }) +
     '</div><div>' +
       '<div class="kpis" style="grid-template-columns:1fr 1fr">' + kpi('Versé', fmt(s.total), 'attendu ' + fmt(s.attendu), 'green') + kpi('Reste dû', fmt(s.reste), s.statut, s.reste ? 'red' : 'green') +
-        kpi('Amendes dues', fmt(s.amendesDues), 'payées ' + fmt(s.amendesPaid), 'orange') + kpi('Grille (auto)', fmt(sc.auto) + ' <small>/' + sc.autoMax + '</small>', '+ appréciation du comité /' + GRILLE.pts_comite, 'navy') + '</div>' +
+        kpi('Amendes dues', fmt(s.amendesDues), 'payées ' + fmt(s.amendesPaid) + cotLateDetail(s), 'orange') + kpi('Grille (auto)', fmt(sc.auto) + ' <small>/' + sc.autoMax + '</small>', '+ appréciation du comité /' + GRILLE.pts_comite, 'navy') + '</div>' +
       panel('Présences', attendanceSummary(s)) +
       panel('Prêt en cours', loan ? '<dl class="dl"><dt>Capital</dt><dd class="num">' + money(loan.capital) + '</dd><dt>Remboursé</dt><dd class="num">' + money(lt.rembourse) + '</dd>' +
         '<dt>Reste</dt><dd class="num">' + money(lt.reste) + '</dd><dt>Mensualités</dt><dd class="num">' + lt.nbPaid + ' / ' + lt.nb + '</dd></dl>' +
         '<div style="margin-top:10px"><button class="btn btn-sm" data-act="openLoan" data-id="' + loan.id + '">Voir l’échéancier</button></div>' : '<span class="muted">Aucun prêt en cours.</span>') +
     '</div></div>';
+}
+function cotLateDetail(s) {
+  const late = (s.cotMonths || []).filter((x) => x.late);
+  return late.length ? '<div class="muted" style="font-size:11.5px;margin-top:4px">Amende cotisation : ' + late.length + ' × ' + fmt(RULES.amende_cot_retard) + ' = ' + money(late.length * num(RULES.amende_cot_retard)) + ' (' + late.map((x) => monthLabel(x.key, true)).join(', ') + ')</div>' : '';
 }
 function attendanceSummary(s) {
   const lbl = { present: 'Présent', retard: 'Retard', represente: 'Représenté', absence: 'Absent' };
@@ -294,7 +307,7 @@ ACTIONS.amendeNew = (code) => openModal({
 /* Feuille de présence d'une réunion : présent / retard / représenté / absent */
 /* Toutes les réunions possibles (dernier jeudi de chaque mois) depuis le démarrage, les plus récentes d'abord */
 function pastMeetingOptions() {
-  const out = []; const start = parseD(RULES.mutuelle_start); const held = new Set(meetingDates().map(fmtD));
+  const out = []; const start = parseD(RULES.mutuelle_start); const held = new Set(heldMeetingDates().map(fmtD));
   for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= today(); d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
     const m = lastThursday(d.getFullYear(), d.getMonth());
     if (m <= today()) out.push({ v: toISO(m), l: longDate(m) + (held.has(fmtD(m)) ? '' : ' — aucune saisie') });
@@ -303,30 +316,39 @@ function pastMeetingOptions() {
 }
 ACTIONS.attendanceSheet = (iso) => {
   const d = parseD(iso) || (lastThursdayOf(today()) <= today() ? lastThursdayOf(today()) : lastThursday(today().getFullYear(), today().getMonth() - 1));
-  const bodyFor = (date) => '<div class="field" style="max-width:320px;margin-bottom:12px"><label>Réunion</label>' + select('date', pastMeetingOptions(), toISO(date)) + '</div>' +
+  const optsFor = (date) => { const o = pastMeetingOptions(); if (!o.some((x) => x.v === toISO(date))) o.unshift({ v: toISO(date), l: longDate(date) }); return o; };
+  const bodyFor = (date) => '<div class="field" style="max-width:320px;margin-bottom:12px"><label>Réunion</label>' + select('date', optsFor(date), toISO(date)) + '</div>' +
     table(['Code', 'Membre', 'Pointage', 'Motif'], DB.members.filter((m) => m.statut !== 'Inactif').sort(sortByCode).map((m) => {
       const rec = attendanceRecord(m.code, date); const type = attendanceType(m.code, date);
       return '<tr><td class="code">' + m.code + '</td><td>' + esc(memberName(m)) + '</td><td>' + select('att_' + m.code, ATT_TYPES, type) + '</td><td>' + input('reason_' + m.code, rec ? rec.reason || '' : '', 'placeholder="facultatif"') + '</td></tr>';
     }));
   openModal({
     title: 'Feuille de présence', wide: true, submit: t('save'), body: '<div id="att-body">' + bodyFor(d) + '</div>' +
-      '<div class="muted" style="margin-top:8px">Sans pointage, un membre qui a cotisé le jour de la réunion est compté présent, sinon absent. Amendes : absence ' + money(RULES.amende_absence) + ', retard ' + money(RULES.amende_retard_reunion) + ', représenté : aucune.</div>',
+      '<div class="banner soft" id="att-quorum" style="margin:10px 0 0"></div>' +
+      '<div class="muted" style="margin-top:8px">Le pointage fait foi : un membre peut cotiser sans être présent. Présent, retard et représenté comptent pour le quorum (50 % + 1). Amendes : absence ' + money(RULES.amende_absence) + ', retard ' + money(RULES.amende_retard_reunion) + ', représenté : aucune.</div>',
     onOpen: (el) => {
-      const rebind = () => el.querySelector('[name=date]').addEventListener('change', (e) => { const nd = parseD(e.target.value); if (nd) { el.querySelector('#att-body').innerHTML = bodyFor(nd); rebind(); } });
+      const quorumLive = () => {
+        const f = el.querySelector('form'); const sel = [...f.querySelectorAll('select[name^=att_]')];
+        const N = sel.length; const req = Math.floor(N / 2) + 1; const pres = sel.filter((s) => s.value !== 'absence').length;
+        el.querySelector('#att-quorum').innerHTML = '<span class="bt">' + pres + ' présent(s) sur ' + N + '</span><span>quorum : ' + req + ' (50 % + 1)</span>' +
+          '<span class="badge ' + (pres >= req ? 'b-green">Quorum atteint' : 'b-red">Pas de quorum') + '</span>';
+      };
+      const rebind = () => {
+        el.querySelector('[name=date]').addEventListener('change', (e) => { const nd = parseD(e.target.value); if (nd) { el.querySelector('#att-body').innerHTML = bodyFor(nd); rebind(); } });
+        el.querySelectorAll('select[name^=att_]').forEach((s) => s.addEventListener('change', quorumLive));
+        quorumLive();
+      };
       rebind();
     },
     onSubmit: (v) => {
       const date = fmtD(v.date); if (!date) { toast('Date invalide.', 'err'); return false; }
       DB.absences = DB.absences.filter((a) => fmtD(a.date) !== date);
       DB.members.filter((m) => m.statut !== 'Inactif').forEach((m) => {
-        const type = v['att_' + m.code];
-        const paid = DB.cotisations.some((c) => c.code === m.code && fmtD(c.date) === date);
-        // On n'enregistre que ce qui diffère du calcul automatique, ou une réunion sans aucune cotisation
-        if (type !== (paid ? 'present' : 'absence') || v['reason_' + m.code] || !DB.cotisations.some((c) => fmtD(c.date) === date)) {
-          DB.absences.push({ code: m.code, date, reason: (v['reason_' + m.code] || '').trim(), type });
-        }
+        // Feuille complète : le pointage fait foi (un membre peut cotiser sans être présent)
+        DB.absences.push({ code: m.code, date, reason: (v['reason_' + m.code] || '').trim(), type: v['att_' + m.code] });
       });
-      saveDB(); toast('Feuille de présence du ' + date + ' enregistrée.', 'ok'); render();
+      saveDB(); const q = quorumInfo(parseD(date));
+      toast('Feuille du ' + date + ' enregistrée : ' + q.pres + ' présent(s) sur ' + q.N + ' — ' + (q.reached ? 'quorum atteint.' : 'PAS DE QUORUM (' + q.req + ' requis) : la réunion ne compte pas.'), q.reached ? 'ok' : 'warn'); render();
     },
   });
 };
@@ -434,7 +456,7 @@ ACTIONS.amendeEdit = (i) => {
 
 /* Registre des présences : membres × réunions tenues ; un clic sur une date ouvre la feuille pour la corriger */
 function attendanceRegister() {
-  const meets = meetingDates();
+  const meets = heldMeetingDates();
   const L = { present: ['P', 'b-green', 'Présent'], retard: ['R', 'b-orange', 'Retard'], represente: ['Rp', 'b-navy', 'Représenté'], absence: ['A', 'b-red', 'Absent'] };
   const head = '<tr><th>Membre</th>' + meets.map((d) => '<th class="c">' + (canEdit() ? '<button class="btn btn-sm" data-act="attendanceSheet" data-id="' + toISO(d) + '" title="Corriger la feuille du ' + esc(longDate(d)) + '">' + fmtD(d).slice(0, 5) + '</button>' : fmtD(d).slice(0, 5)) + '</th>').join('') + '<th class="n">Prés.</th></tr>';
   const rows = DB.members.filter((m) => m.statut !== 'Inactif').sort(sortByCode).map((m) => {
@@ -446,9 +468,10 @@ function attendanceRegister() {
       return '<td class="c"><span class="badge ' + L[ty][1] + '" title="' + L[ty][2] + (rec && rec.reason ? ' — ' + esc(rec.reason) : '') + '">' + L[ty][0] + '</span></td>';
     }).join('');
     return '<tr><td><span class="code">' + m.code + '</span> ' + esc(memberName(m)) + '</td>' + cells + '<td class="n num">' + pres + '/' + tot + '</td></tr>';
-  }).join('');
+  }).join('') + '<tr><td><b>Quorum</b></td>' + meets.map((d) => { const q = quorumInfo(d);
+    return '<td class="c"><span class="badge ' + (q.reached ? 'b-green' : 'b-red') + '" title="' + q.pres + ' présents / ' + q.req + ' requis' + (q.sheet ? '' : ' (présence estimée, pas de feuille)') + '">' + q.pres + '/' + q.req + '</span></td>'; }).join('') + '<td></td></tr>';
   return '<section class="panel"><div class="panel-head"><h2>Registre des présences</h2><span class="meta">P présent · R retard · Rp représenté · A absent</span>' +
     (canEdit() ? '<div class="right"><button class="btn btn-sm btn-primary" data-act="attendanceSheet">Pointer une réunion</button></div>' : '') + '</div>' +
     (meets.length ? '<div class="tbl-wrap"><table class="tbl"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' : '<div class="empty">Aucune réunion enregistrée.</div>') +
-    '<div class="section-note">Cliquez sur une date pour corriger la feuille de présence de cette réunion. Sans pointage, un membre qui a cotisé le jour de la réunion est compté présent.</div></section>';
+    '<div class="section-note">Cliquez sur une date pour faire ou corriger la feuille de présence. Le pointage fait foi ; pour les anciennes réunions sans feuille, la présence est estimée d’après les cotisations du jour. Ligne Quorum : présents / requis. Voir aussi l’onglet <button class="btn-link" data-go="reunions">Réunions et quorum</button>.</div></section>';
 }

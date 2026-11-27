@@ -17,9 +17,10 @@
   --ink-2: #4A5565;
   --ink-3: #7A8494;
   --radius: 6px;
-  --f-title: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --f-body: 'Inter', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-  --f-num: 'JetBrains Mono', ui-monospace, Consolas, 'Courier New', monospace;
+  /* Police unique, embarquée dans l'application (fonctionne hors ligne) */
+  --f-title: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --f-body: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --f-num: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -31,7 +32,7 @@ body {
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--navy); }
-.num, td.n, th.n { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.num, td.n, th.n, .kpi .v, .code { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
 .hidden { display: none !important; }
 .offscreen-input { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
 
@@ -305,3 +306,18 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table { break-inside: auto; }
   tr { break-inside: avoid; }
 }
+
+/* ---------- Écran de bienvenue ---------- */
+.welcome { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: radial-gradient(circle at 50% 30%, #24508f 0%, var(--navy) 45%, var(--navy-900) 100%); animation: wIn .45s ease both; cursor: pointer; }
+.welcome.out { animation: wOut .35s ease both; }
+.welcome-card { text-align: center; color: #fff; max-width: 420px; }
+.welcome-logo { width: 150px; height: 150px; object-fit: contain; background: #fff; border-radius: 50%; padding: 12px; box-shadow: 0 0 0 6px rgba(232,101,10,.35); animation: wLogo .8s cubic-bezier(.2,.9,.3,1.2) both; }
+.welcome-hello { margin-top: 22px; font-size: 15px; letter-spacing: .18em; text-transform: uppercase; color: #F7B27A; font-weight: 700; }
+.welcome-name { font-family: var(--f-title); font-size: 28px; font-weight: 700; margin-top: 4px; line-height: 1.2; }
+.welcome-line { width: 60px; height: 3px; background: var(--orange); margin: 16px auto; border-radius: 2px; }
+.welcome-sub { color: #C9D4E6; font-size: 13px; }
+.welcome-meet { color: #fff; font-size: 13px; margin: 14px 0 22px; opacity: .92; }
+@keyframes wIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wOut { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+@keyframes wLogo { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }

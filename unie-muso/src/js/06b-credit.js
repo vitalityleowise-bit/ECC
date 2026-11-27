@@ -33,19 +33,26 @@ PAGES.demandes = function () {
       '<td class="act"><button class="btn btn-sm' + (me && !mine && d.statut === 'En attente' ? ' btn-accent' : '') + '" data-act="demEval" data-id="' + d.id + '">' + (me && !mine ? 'Donner ma note' : 'Grille') + '</button>' +
       ((canGradeAll() || me) && !isOwnDemande(d) ? '<button class="btn btn-sm" data-act="demDecide" data-id="' + d.id + '">Décision</button>' : '') +
       (isOwnDemande(d) ? '<span class="badge b-grey" title="Conflit d’intérêts">votre demande</span>' : '') +
-      (d.statut === 'Approuvée' && num(d.montant_approuve) > 0 && !d.pret_id && !isOwnDemande(d) && (isAdmin() || currentRole() === 'comite' || currentRole() === 'caissier') ? '<button class="btn btn-sm btn-primary" data-act="demCreateLoan" data-id="' + d.id + '">Créer le prêt →</button>' : '') +
-      (d.pret_id && canSee('prets') ? '<button class="btn btn-sm" data-act="openLoan" data-id="' + d.pret_id + '">Prêt #' + d.pret_id + '</button>' : '') + '</td></tr>';
+      (d.statut === 'Approuvée' && num(d.montant_approuve) > 0 && !d.pret_id && !isOwnDemande(d) && (canEdit() || currentRole() === 'comite') ? '<button class="btn btn-sm btn-primary" data-act="demCreateLoan" data-id="' + d.id + '">Créer le prêt →</button>' : '') +
+      (d.pret_id && canSee('prets') ? '<button class="btn btn-sm" data-act="openLoan" data-id="' + d.pret_id + '">Prêt #' + d.pret_id + '</button>' : '') +
+      (canEdit() && !d.pret_id ? '<button class="btn btn-sm btn-danger" data-act="demDel" data-id="' + d.id + '">' + t('del') + '</button>' : '') + '</td></tr>';
   });
   return pageHead('Gestion', t('demandes'), 'Grille officielle : rubriques 1 à 3 calculées automatiquement (80 pts), rubrique 4 = moyenne des notes des membres du comité (20 pts). La décision finale revient au comité.',
     '<button class="btn" data-act="grillePrint">Grille vierge</button><button class="btn btn-primary" data-act="demNew">Nouvelle demande</button>') +
     '<section class="panel"><div class="toolbar"><select data-change="demFilter">' + ['', 'En attente', 'Approuvée', 'Rejetée'].map((s) => '<option value="' + s + '"' + (s === f ? ' selected' : '') + '>' + (s || 'Tous les statuts') + '</option>').join('') + '</select></div>' +
     table(['N°', 'Date', 'Membre', ['Demandé', 'n'], 'Motif', ['Auto', 'n'], 'Note finale', ['Somme grille', 'n'], 'Statut', ''], rows) + '</section>';
 };
+ACTIONS.demDel = (id) => {
+  const d = DB.demandes_pret.find((x) => +x.id === +id);
+  confirmBox('Supprimer la demande', 'Supprimer la demande #' + d.id + ' de ' + esc(nameOf(d.code_membre)) + ' (' + money(d.montant_demande) + ') ?', () => {
+    DB.demandes_pret = DB.demandes_pret.filter((x) => +x.id !== +id); saveDB(); toast('Demande supprimée.', 'ok'); render();
+  }, t('del'));
+};
 ACTIONS.demFilter = (_i, el) => { STATE.dfilt = el.value; render(); };
 
 function demandeForm(fixedCode) {
   return '<div class="form-grid">' + (fixedCode ? '<input type="hidden" name="code" value="' + fixedCode + '">' + field(t('member'), '<input value="' + esc(fixedCode + ' — ' + nameOf(fixedCode)) + '" readonly>', 'full')
-    : field(t('member'), select('code', memberOptions(true)), 'full')) +
+    : field(t('member'), select('code', memberOptions(true).filter((o) => !activeLoan(o.v))), 'full', 'Les membres ayant un prêt en cours ne figurent pas dans la liste.')) +
     field('Date de la demande', input('date', toISO(today()), 'type="date"')) + field('Montant demandé (HTG)', input('montant', '', 'type="number" min="1" step="any" required')) +
     field('Motif / projet', '<textarea name="motif" placeholder="Ex. : commerce, scolarité, santé…"></textarea>', 'full') + '<div class="full" id="dem-prev"></div></div>';
 }
@@ -61,6 +68,7 @@ function bindDemandePreview(el) {
 }
 function saveDemande(d) {
   if (num(d.montant) <= 0) { toast('Montant invalide.', 'err'); return false; }
+  if (activeLoan(d.code)) { toast(nameOf(d.code) + ' a déjà un prêt en cours : pas de nouvelle demande avant le remboursement complet.', 'err'); return false; }
   const sc = creditScore(d.code);
   DB.demandes_pret.push({
     id: nextDemandeId(), code_membre: d.code, nom_membre: nameOf(d.code), date_demande: fmtD(d.date), montant_demande: num(d.montant), motif: d.motif.trim(),
@@ -71,7 +79,8 @@ function saveDemande(d) {
   saveDB(); toast('Demande enregistrée. Elle sera évaluée par le comité.', 'ok'); render();
 }
 ACTIONS.demNew = (code) => {
-  const fixed = currentRole() === 'membre' || (currentRole() === 'comite' && code === 'self') ? currentMember().code : null;
+  const fixed = currentRole() === 'membre' || ((currentRole() === 'comite' || currentRole() === 'editeur') && code === 'self') ? currentMember().code : null;
+  if (fixed && activeLoan(fixed)) { toast('Vous avez déjà un prêt en cours : nouvelle demande possible après le remboursement complet.', 'err'); return; }
   openModal({ title: 'Demande de prêt', body: demandeForm(fixed), submit: 'Envoyer la demande', onOpen: bindDemandePreview, onSubmit: saveDemande });
 };
 
@@ -114,7 +123,7 @@ function gridTableHTML(d, editable) {
   h += '<tr><td colspan="3"><b>Moyenne du comité</b></td><td class="n"><b class="num">' + (ev.appreciation === null ? '—' : fmt(ev.appreciation)) + '</b></td></tr>';
   h += '</tbody><tfoot><tr><td colspan="3">TOTAL / 100</td><td class="n">' + (ev.complete ? fmt(ev.total) : fmt(ev.pres + ev.cot + ev.cred) + ' + ?') + '</td></tr></tfoot></table></div>';
   h += '<div class="banner ' + (ev.complete ? (ev.seuil.eligible ? 'soft' : 'import') : 'soft') + '" style="margin:12px 0 0"><span>' + (ev.complete
-    ? 'Barème : <b>' + esc(ev.seuil.label) + '</b> — ' + esc(ev.seuil.regle || '') + ' = <b class="num">' + money(ev.montant) + '</b> (cotisations Caisse Verte à jour : ' + money(sc.base) + ')'
+    ? !ev.seuil.eligible ? 'Barème : <b>' + esc(ev.seuil.label) + '</b> — note de 50 ou moins : non éligible, aucun montant maximum.' : 'Barème : <b>' + esc(ev.seuil.label) + '</b> — ' + esc(ev.seuil.regle || '') + ' = <b class="num">' + money(ev.montant) + '</b> (cotisations Caisse Verte à jour : ' + money(sc.base) + ')'
     : 'En attente des notes du comité (' + ev.notes.length + '/' + ev.nbComite + ').') + '</span></div>';
   return h;
 }
@@ -213,7 +222,7 @@ PAGES.grille = function () {
     return '<tr class="clickable" data-act="openMember" data-id="' + m.code + '"><td class="code">' + m.code + '</td><td>' + esc(memberName(m)) + '</td>' +
       '<td class="n">' + fmt(sc.pres.pts) + '</td><td class="n">' + fmt(sc.cot.pts) + '</td><td class="n">' + fmt(sc.cred.pts) + '</td>' +
       '<td class="n"><b class="num">' + fmt(sc.auto) + '</b></td><td class="n">' + fmt(sc.base) + '</td>' +
-      '<td>' + '<span class="badge ' + (sc.bestSeuil.eligible ? 'b-green' : 'b-red') + '">' + esc(sc.bestSeuil.label) + '</span></td><td class="n">' + fmt(sc.bestMax) + '</td>' +
+      '<td>' + '<span class="badge ' + (sc.bestSeuil.eligible ? 'b-green' : 'b-red') + '">' + esc(sc.bestSeuil.label) + '</span></td><td class="n">' + (sc.bestSeuil.eligible ? fmt(sc.bestMax) : '—') + '</td>' +
       '<td>' + (sc.hasLoan ? '<span class="badge b-orange">Prêt en cours</span>' : '') + '</td></tr>';
   });
   return pageHead('Gestion', t('grille'), 'Rubriques automatiques : présences /' + GRILLE.pts_presence + ' · cotisations /' + GRILLE.pts_cotisation + ' · 3 derniers prêts /' + (GRILLE.pts_credit * GRILLE.nb_credits) + ' — l’appréciation du comité (/' + GRILLE.pts_comite + ') se donne sur chaque demande.',

@@ -3,7 +3,7 @@
    ========================================================================= */
 const I18N = {
   fr: {
-    g_gestion: 'Gestion', g_compte: 'Mon compte', g_treso: 'Trésorerie', g_compta: 'Comptabilité', g_rapports: 'Rapports', g_docs: 'Documents', g_outils: 'Outils',
+    g_gestion: 'Gestion', g_compte: 'Mon compte', g_comm: 'Communication', reunions: 'Réunions et quorum', messages: 'Messages et suggestions', caissebleue: 'Caisse Bleue', g_treso: 'Trésorerie', g_compta: 'Comptabilité', g_rapports: 'Rapports', g_docs: 'Documents', g_outils: 'Outils',
     dashboard: 'Tableau de bord', membres: 'Membres', cotisations: 'Cotisations', previsions: 'Prévisions', prets: 'Prêts & remboursements',
     demandes: 'Demandes de prêt', grille: 'Grille de crédit', depenses: 'Dépenses', stats: 'Statistiques', moncompte: 'Mon compte',
     caisse: 'Caisse', banque: 'Banque', journal: 'Journal', balance: 'Balance', bilan: 'Bilan', resultats: 'État résultats',
@@ -16,7 +16,7 @@ const I18N = {
     tagline: 'Mutuelle de solidarité — épargne, crédit et entraide entre membres.',
   },
   kr: {
-    g_gestion: 'Jesyon', g_compte: 'Kont mwen', g_treso: 'Trezori', g_compta: 'Kontablite', g_rapports: 'Rapò', g_docs: 'Dokiman', g_outils: 'Zouti',
+    g_gestion: 'Jesyon', g_compte: 'Kont mwen', g_comm: 'Kominikasyon', reunions: 'Reyinyon ak kowòm', messages: 'Mesaj ak sijesyon', caissebleue: 'Kès Ble', g_treso: 'Trezori', g_compta: 'Kontablite', g_rapports: 'Rapò', g_docs: 'Dokiman', g_outils: 'Zouti',
     dashboard: 'Tablo jeneral', membres: 'Manm yo', cotisations: 'Kotizasyon', previsions: 'Previzyon', prets: 'Prè ak ranbousman',
     demandes: 'Demann prè', grille: 'Grid kredi', depenses: 'Depans', stats: 'Estatistik', moncompte: 'Kont mwen',
     caisse: 'Kès', banque: 'Bank', journal: 'Jounal', balance: 'Balans', bilan: 'Bilan', resultats: 'Rezilta',
@@ -106,6 +106,7 @@ function currentRole() {
   if (!SESSION) return null;
   if (SESSION.type === 'user') { const u = USERS[SESSION.id]; return u ? u.role : null; }
   const m = getMember(SESSION.code);
+  if (m && SETTINGS.editor_code && m.code === SETTINGS.editor_code) return 'editeur';
   return m && m.is_comite ? 'comite' : 'membre';
 }
 function currentMember() { return SESSION && SESSION.type === 'member' ? getMember(SESSION.code) : null; }
@@ -135,6 +136,7 @@ function afterLogin() {
   store.rawSet(KEYS.session, JSON.stringify(SESSION));
   const role = currentRole();
   STATE.page = role === 'membre' || role === 'comite' ? 'moncompte' : 'dashboard';
+  showWelcome();
   render();
   tryShowNotifications(true);
 }
@@ -142,26 +144,30 @@ function logout() { SESSION = null; try { localStorage.removeItem(KEYS.session);
 
 /* Pages : groupe, droits d'accès */
 const PAGE_DEFS = [
-  { id: 'dashboard', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'membres', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'cotisations', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'previsions', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'prets', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'demandes', g: 'g_gestion', roles: ['admin', 'caissier', 'comite:demandes'] },
-  { id: 'grille', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'depenses', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'stats', g: 'g_gestion', roles: ['admin', 'caissier'] },
-  { id: 'moncompte', g: 'g_compte', roles: ['membre', 'comite'] },
-  { id: 'caisse', g: 'g_treso', roles: ['admin', 'caissier'] },
-  { id: 'banque', g: 'g_treso', roles: ['admin', 'caissier'] },
-  { id: 'journal', g: 'g_compta', roles: ['admin', 'comite:compta'] },
-  { id: 'balance', g: 'g_compta', roles: ['admin', 'comite:compta'] },
-  { id: 'bilan', g: 'g_compta', roles: ['admin', 'comite:compta'] },
-  { id: 'resultats', g: 'g_compta', roles: ['admin', 'comite:compta'] },
-  { id: 'rapport', g: 'g_rapports', roles: ['admin', 'caissier', 'membre', 'comite'] },
-  { id: 'statuts', g: 'g_docs', roles: ['admin', 'caissier', 'docs'] },
-  { id: 'reglement', g: 'g_docs', roles: ['admin', 'caissier', 'docs'] },
-  { id: 'sauvegarde', g: 'g_outils', roles: ['admin', 'caissier'] },
+  { id: 'dashboard', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'membres', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'cotisations', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'previsions', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'reunions', g: 'g_gestion', roles: ['admin', 'editeur', 'comite'] },
+  { id: 'prets', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'demandes', g: 'g_gestion', roles: ['admin', 'editeur', 'comite:demandes'] },
+  { id: 'grille', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'depenses', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'stats', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'moncompte', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
+  { id: 'messages', g: 'g_comm', roles: ['admin', 'editeur', 'comite'] },
+  { id: 'caisse', g: 'g_treso', roles: ['admin', 'editeur'] },
+  { id: 'banque', g: 'g_treso', roles: ['admin', 'editeur'] },
+  { id: 'caissebleue', g: 'g_treso', roles: ['admin', 'editeur'] },
+  { id: 'journal', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
+  { id: 'balance', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
+  { id: 'bilan', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
+  { id: 'resultats', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
+  // Rapport complet : comité et personnes autorisées ; les autres membres voient le résumé dans « Mon compte »
+  { id: 'rapport', g: 'g_rapports', roles: ['admin', 'editeur', 'comite'] },
+  { id: 'statuts', g: 'g_docs', roles: ['admin', 'editeur', 'docs'] },
+  { id: 'reglement', g: 'g_docs', roles: ['admin', 'editeur', 'docs'] },
+  { id: 'sauvegarde', g: 'g_outils', roles: ['admin', 'editeur'] },
   { id: 'parametres', g: 'g_outils', roles: ['admin'] },
 ];
 function canSee(pageId) {
@@ -183,7 +189,7 @@ function go(page, param) {
   document.querySelector('.app') && document.querySelector('.app').classList.remove('menu-open');
   render(); window.scrollTo(0, 0);
 }
-function canEdit() { const r = currentRole(); return r === 'admin' || r === 'caissier'; }
+function canEdit() { const r = currentRole(); return r === 'admin' || r === 'editeur'; }
 function isAdmin() { return currentRole() === 'admin'; }
 
 /* ---------- Rendu global ---------- */
@@ -228,7 +234,7 @@ function sidebarHTML() {
     g.items.push(p);
   });
   const pending = DB.demandes_pret.filter((d) => d.statut === 'En attente').length;
-  const roleLabel = { admin: 'Administrateur', caissier: 'Caissier', membre: 'Membre', comite: 'Membre du comité' }[currentRole()];
+  const roleLabel = { admin: 'Administrateur', editeur: 'Autorisé à modifier', membre: 'Membre', comite: 'Membre du comité' }[currentRole()];
   const u = SESSION.type === 'user' ? USERS[SESSION.id] : null; const m = currentMember();
   return '<aside class="sidebar" aria-label="Navigation">' +
     '<div class="sb-brand">' + logoImg() + '<div><div class="t">UNIE-MUSO</div><div class="s">Petit-Goâve</div></div></div>' +
@@ -241,6 +247,7 @@ function sidebarHTML() {
 }
 let CHARTS_AFTER = [];
 function render() {
+  resetCalc();
   if (!SESSION) { renderLogin(); return; }
   if (!canSee(STATE.page)) STATE.page = PAGE_DEFS.find((p) => canSee(p.id)).id;
   const page = PAGES[STATE.page];

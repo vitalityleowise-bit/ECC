@@ -143,20 +143,33 @@ ACTIONS.loanEdit = (id) => {
 
 /* ---------- Dépenses ---------- */
 PAGES.depenses = function () {
-  const list = DB.depenses.map((d, i) => Object.assign({ i }, d)).sort((a, b) => parseD(b.date) - parseD(a.date));
+  const fm = STATE.dmonth || '';
+  const months = monthsRange(monthKey(RULES.mutuelle_start), monthKey(today())).reverse();
+  const list = DB.depenses.map((d, i) => Object.assign({ i }, d)).filter((d) => !fm || monthKey(d.date) === fm).sort((a, b) => parseD(b.date) - parseD(a.date));
+  const byMonth = months.map((k) => { const ds = DB.depenses.filter((d) => monthKey(d.date) === k); return { k, n: ds.length, t: sum(ds, (d) => d.montant) }; }).filter((x) => x.n);
   const rows = list.map((d) => '<tr><td class="num">' + esc(d.date) + '</td><td class="code">' + esc(d.piece || '') + '</td><td>' + esc(d.beneficiaire || '') + '</td><td>' + esc(d.categorie) + '</td>' +
     '<td>' + esc(d.caisse || '') + '</td><td>' + esc(d.mode || BANK) + '</td><td class="n">' + fmt(d.montant) + '</td>' +
     '<td class="act">' + (d.recu ? '<button class="btn btn-sm" data-act="depRecu" data-id="' + d.i + '">Reçu</button>' : '') +
     (canEdit() ? '<button class="btn btn-sm" data-act="depEdit" data-id="' + d.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="depDel" data-id="' + d.i + '">' + t('del') + '</button>' : '') + '</td></tr>');
   const byCat = DEP_CATS.map((c) => '<tr><td>' + esc(c.label) + '</td><td class="code">' + c.acc + '</td><td class="n">' + fmt(sum(DB.depenses.filter((d) => d.categorie === c.label), (d) => d.montant)) + '</td></tr>');
   return pageHead('Gestion', t('depenses'), list.length + ' dépense(s) · ' + money(sum(list, (d) => d.montant)), canEdit() ? '<button class="btn btn-primary" data-act="depNew">Nouvelle dépense</button>' : '') +
-    '<div class="grid-2-1"><section class="panel">' + table(['Date', 'Pièce', 'Bénéficiaire', 'Catégorie', 'Caisse', 'Payé par', ['Montant', 'n'], ''], rows) + '</section>' +
-    panel('Par catégorie', table(['Catégorie', 'Compte', ['Total', 'n']], byCat), { flush: true, note: 'Règlement : les secours ne doivent pas dépasser 15 % de la Caisse Rouge (actuellement ' + money(treasury().rougeFonds * 0.15) + ').' }) + '</div>';
+    '<div class="grid-2-1"><section class="panel"><div class="toolbar"><select data-change="depMonth"><option value="">Tous les mois</option>' +
+      months.map((k) => '<option value="' + k + '"' + (k === fm ? ' selected' : '') + '>' + monthLabel(k) + '</option>').join('') + '</select>' +
+      (canEdit() && fm ? '<button class="btn btn-sm btn-primary" data-act="depNew" data-id="' + fm + '">Ajouter une dépense en ' + esc(monthLabel(fm).toLowerCase()) + '</button>' : '') +
+      '<span class="muted" style="margin-left:auto">' + list.length + ' · ' + money(sum(list, (d) => d.montant)) + '</span></div>' +
+      table(['Date', 'Pièce', 'Bénéficiaire', 'Catégorie', 'Caisse', 'Payé par', ['Montant', 'n'], ''], rows,
+        '<tr><td colspan="6">Total' + (fm ? ' ' + esc(monthLabel(fm).toLowerCase()) : '') + '</td><td class="n">' + fmt(sum(list, (d) => d.montant)) + '</td><td></td></tr>') + '</section><div>' +
+    panel('Total par mois', table(['Mois', ['Nb', 'n'], ['Total', 'n']], byMonth.map((x) => '<tr class="clickable" data-act="depMonthGo" data-id="' + x.k + '"><td>' + monthLabel(x.k) + '</td><td class="n">' + x.n + '</td><td class="n">' + fmt(x.t) + '</td></tr>'),
+      '<tr><td>Total</td><td class="n">' + DB.depenses.length + '</td><td class="n">' + fmt(sum(DB.depenses, (d) => d.montant)) + '</td></tr>'), { flush: true }) +
+    panel('Par catégorie', table(['Catégorie', 'Compte', ['Total', 'n']], byCat), { flush: true, note: 'Règlement : les secours ne doivent pas dépasser 15 % de la Caisse Rouge (actuellement ' + money(treasury().rougeFonds * 0.15) + ').' }) + '</div></div>';
 };
 function depForm(d) {
   d = d || { date: fmtD(today()), categorie: DEP_CATS[0].label, caisse: 'Caisse Verte', mode: BANK, piece: 'DEP-' + String(DB.depenses.length + 1).padStart(3, '0') };
   return '<div class="form-grid">' + field(t('date'), input('date', toISO(d.date), 'type="date"')) + field('N° de pièce', input('piece', d.piece)) +
-    field('Bénéficiaire', input('beneficiaire', d.beneficiaire || ''), 'full') + field('Catégorie', select('categorie', DEP_CATS.map((c) => c.label), d.categorie)) +
+    field('Bénéficiaire', (() => { const opts = memberOptions().map((o) => ({ v: memberName(getMember(o.v)) + ' (' + o.v + ')', l: o.l }));
+      const isMember = opts.some((o) => o.v === d.beneficiaire);
+      return select('benef_sel', [{ v: '', l: '— Choisir un membre —' }].concat(opts).concat([{ v: '__autre', l: 'Autre (banque, fournisseur…)' }]), isMember ? d.beneficiaire : (d.beneficiaire ? '__autre' : '')) +
+        '<input name="beneficiaire" value="' + esc(isMember ? '' : (d.beneficiaire || '')) + '" placeholder="Nom du bénéficiaire" style="margin-top:6px' + (isMember || !d.beneficiaire ? ';display:none' : '') + '">'; })(), 'full') + field('Catégorie', select('categorie', DEP_CATS.map((c) => c.label), d.categorie)) +
     field(t('amount') + ' (HTG)', input('montant', d.montant || '', 'type="number" min="0" step="any" required')) +
     field('Imputée à', select('caisse', ['Caisse Verte', 'Caisse Rouge'], d.caisse || 'Caisse Verte'), '', 'Secours → Caisse Rouge ; frais courants → produits (Caisse Verte).') +
     field('Payé par', select('mode', [BANK, CASH], d.mode || BANK)) +
@@ -165,15 +178,23 @@ function depForm(d) {
 }
 function saveDep(v, idx) {
   if (num(v.montant) <= 0) { toast('Montant invalide.', 'err'); return false; }
-  const rec = { date: fmtD(v.date), piece: v.piece.trim(), caisse: v.caisse, beneficiaire: v.beneficiaire.trim(), categorie: v.categorie, montant: num(v.montant), mode: v.mode, recu: v.recu };
+  const benef = v.benef_sel && v.benef_sel !== '__autre' ? v.benef_sel : (v.beneficiaire || '').trim();
+  const rec = { date: fmtD(v.date), piece: v.piece.trim(), caisse: v.caisse, beneficiaire: benef, categorie: v.categorie, montant: num(v.montant), mode: v.mode, recu: v.recu };
   if (idx === undefined) DB.depenses.push(rec); else DB.depenses[idx] = rec;
   saveDB(); toast('Dépense enregistrée.', 'ok'); render();
 }
 function bindDepCat(el) {
   const f = el.querySelector('form');
+  f.benef_sel.addEventListener('change', () => { f.beneficiaire.style.display = f.benef_sel.value === '__autre' ? '' : 'none'; if (f.benef_sel.value === '__autre') f.beneficiaire.focus(); });
   f.categorie.addEventListener('change', () => { f.caisse.value = depAccount(f.categorie.value) === 5020 ? 'Caisse Rouge' : 'Caisse Verte'; });
 }
-ACTIONS.depNew = () => openModal({ title: 'Nouvelle dépense', body: depForm(), submit: t('save'), onOpen: bindDepCat, onSubmit: (v) => saveDep(v) });
+ACTIONS.depNew = (month) => {
+  // Dépense d'un mois passé : date proposée au dernier jeudi de ce mois
+  const d = month && /^\d{4}-\d{2}$/.test(month) ? { date: fmtD(lastThursday(+month.slice(0, 4), +month.slice(5) - 1)), categorie: DEP_CATS[0].label, caisse: 'Caisse Verte', mode: BANK, piece: 'DEP-' + String(DB.depenses.length + 1).padStart(3, '0') } : null;
+  openModal({ title: 'Nouvelle dépense', body: depForm(d), submit: t('save'), onOpen: bindDepCat, onSubmit: (v) => saveDep(v) });
+};
+ACTIONS.depMonth = (_i, el) => { STATE.dmonth = el.value; render(); };
+ACTIONS.depMonthGo = (k) => { STATE.dmonth = k; render(); };
 ACTIONS.depEdit = (i) => openModal({ title: 'Modifier la dépense', body: depForm(DB.depenses[+i]), submit: t('save'), onOpen: bindDepCat, onSubmit: (v) => saveDep(v, +i) });
 ACTIONS.depDel = (i) => confirmBox('Supprimer la dépense', 'Supprimer cette dépense de ' + money(DB.depenses[+i].montant) + ' ?', () => { DB.depenses.splice(+i, 1); saveDB(); render(); }, t('del'));
 ACTIONS.depPickRecu = () => pickFile('image/*', (f) => readImage(f, 1400, 0.72).then((data) => {
@@ -199,7 +220,7 @@ PAGES.stats = function () {
   return pageHead('Gestion', t('stats'), 'Depuis le ' + fmtD(RULES.mutuelle_start)) +
     '<div class="kpis">' + kpi('Cotisations', fmt(sum(ms, (m) => m.verte + m.rouge)) + ' <small>HTG</small>', DB.cotisations.length + ' versements', 'navy') +
       kpi('Amendes', fmt(sum(ms, (m) => m.amendes)) + ' <small>HTG</small>', DB.amendes_paid.length + ' amendes', 'orange') +
-      kpi('Dépenses', fmt(sum(ms, (m) => m.depenses)) + ' <small>HTG</small>', '', 'red') +
+      kpi('Dépenses', fmt(sum(ms, (m) => m.depenses)) + ' <small>HTG</small>', DB.depenses.length + ' pièce(s)', 'red') +
       kpi('Prêts octroyés', fmt(sum(ms, (m) => m.prets)) + ' <small>HTG</small>', DB.prets.length + ' prêts', 'green') +
       kpi('Meilleur mois', best ? monthLabel(best.key) : '—', best ? money(best.verte + best.rouge) : '', 'green') +
       kpi('Mois le plus faible', worst ? monthLabel(worst.key) : '—', worst ? money(worst.verte + worst.rouge) : '', 'red') + '</div>' +
@@ -208,6 +229,8 @@ PAGES.stats = function () {
       panel('Cotisations, amendes et prêts', barChart(labels, [{ label: 'Cotisations', color: C.navy, values: ms.map((m) => m.verte + m.rouge) }, { label: 'Amendes', color: C.orange, values: ms.map((m) => m.amendes) }, { label: 'Prêts', color: C.grey, values: ms.map((m) => m.prets) }], { title: 'Comparaison mensuelle' })) +
       panel('Par trimestre', barChart(qk, [{ label: 'Caisse Verte', color: C.green, values: qk.map((k) => quarters[k].verte) }, { label: 'Caisse Rouge', color: C.red, values: qk.map((k) => quarters[k].rouge) }], { stacked: true, title: 'Cotisations trimestrielles' })) +
     '</div>' +
+    panel('Dépenses par mois', barChart(labels, [{ label: 'Dépenses', color: C.red, values: ms.map((m) => m.depenses) }], { title: 'Dépenses mensuelles', h: 200 }) +
+      '<div class="legend">Total : ' + money(sum(ms, (m) => m.depenses)) + ' · moyenne ' + money(ms.length ? sum(ms, (m) => m.depenses) / ms.length : 0) + ' par mois</div>') +
     panel('Détail mensuel', table(['Mois', ['Verte', 'n'], ['Rouge', 'n'], ['Total', 'n'], ['Versements', 'n'], ['Amendes', 'n'], ['Dépenses', 'n'], ['Prêts', 'n'], ['Rembours.', 'n']], ms.map((m) =>
       '<tr><td>' + monthLabel(m.key) + '</td><td class="n">' + fmt(m.verte) + '</td><td class="n">' + fmt(m.rouge) + '</td><td class="n">' + fmt(m.verte + m.rouge) + '</td><td class="n">' + m.nbCot + '</td><td class="n">' + fmt(m.amendes) + '</td><td class="n">' + fmt(m.depenses) + '</td><td class="n">' + fmt(m.prets) + '</td><td class="n">' + fmt(m.remb) + '</td></tr>')), { flush: true }) +
     panel('Détail trimestriel', table(['Trimestre', ['Verte', 'n'], ['Rouge', 'n'], ['Amendes', 'n'], ['Dépenses', 'n'], ['Prêts', 'n'], ['Rembours.', 'n']], qk.map((k) => {
