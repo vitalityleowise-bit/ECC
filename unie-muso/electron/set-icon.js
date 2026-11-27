@@ -17,7 +17,7 @@ vi.setStringValues(lang, {
   FileDescription: 'UNIE-MUSO', ProductName: 'UNIE-MUSO', CompanyName: 'UNIE-MUSO', InternalName: 'UNIE-MUSO',
   OriginalFilename: 'UNIE-MUSO.exe', LegalCopyright: 'UNIE-MUSO, Petit-Goave',
 });
-vi.setFileVersion(3, 6, 3, 0, 1033); vi.setProductVersion(3, 6, 3, 0, 1033);
+vi.setFileVersion(3, 6, 4, 0, 1033); vi.setProductVersion(3, 6, 4, 0, 1033);
 vi.outputToResourceEntries(resource.entries);
 resource.outputResource(exeObj);
 fs.writeFileSync(exe, Buffer.from(exeObj.generate()));

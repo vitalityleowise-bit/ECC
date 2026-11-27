@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.6.3 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.6.4 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -106,6 +106,10 @@ POINTS TECHNIQUES IMPORTANTS
   Limite : l'application doit être ouverte ou en arrière-plan (sur PC elle reste
   dans la zone de notification). Application fermée sur le téléphone = pas de
   notification : il faudrait Firebase Cloud Messaging + Cloud Functions (formule Blaze).
+- 3.6.4 : envoi plus rapide depuis le PC. pushAll envoie d'abord messages / annonces /
+  demandes (pushCollab) puis les grandes listes (pushShared) ; un envoi demandé pendant un
+  autre n'est plus perdu (ONLINE.pushAgain). Au retour au premier plan après plus de 20 s,
+  la connexion Firestore est rouverte (disableNetwork puis enableNetwork).
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer

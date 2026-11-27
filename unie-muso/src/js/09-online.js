@@ -110,7 +110,17 @@ async function goOnline() {
 function goOffline() { stopListeners(); ONLINE.who = ''; if (ONLINE.auth) ONLINE.auth.signOut().catch(() => {}); setOnlineStatus('off'); }
 window.addEventListener('online', () => { if (SESSION) goOnline(); });
 // Retour dans l'application (téléphone sorti de veille, autre appli fermée) : nouvel essai immédiat
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && SESSION && ONLINE.status === 'err') goOnline(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { ONLINE.hiddenAt = Date.now(); return; }
+  if (!SESSION) return;
+  if (ONLINE.status === 'err') { goOnline(); return; }
+  // Après un passage en arrière-plan (téléphone en veille, autre appli), Android ralentit la connexion :
+  // on la rouvre tout de suite pour recevoir annonces et messages sans attendre
+  if (ONLINE.who && ONLINE.fs && ONLINE.hiddenAt && Date.now() - ONLINE.hiddenAt > 20000) {
+    ONLINE.hiddenAt = 0;
+    ONLINE.fs.disableNetwork().then(() => ONLINE.fs.enableNetwork()).catch(() => {});
+  }
+});
 window.addEventListener('offline', () => setOnlineStatus('off', 'Hors ligne : vos changements sont gardés et seront envoyés au retour d’Internet.'));
 
 /* ---------- Envoi (local → serveur) ---------- */
@@ -187,9 +197,14 @@ async function pushCollab() {
   }
 }
 async function pushAll() {
-  if (!ONLINE.who || ONLINE.pushing) return;
+  if (!ONLINE.who) return;
+  // Un envoi est déjà en cours : on le refait juste après (avant, la modification attendait la suivante)
+  if (ONLINE.pushing) { ONLINE.pushAgain = true; return; }
   ONLINE.pushing = true; setOnlineStatus('sync');
-  try { await pushShared(); await pushCollab(); } finally { ONLINE.pushing = false; }
+  // Messages, annonces, suggestions, demandes d'abord (petits, attendus tout de suite),
+  // puis les grandes listes partagées (membres avec photos, cotisations, réunions…)
+  try { await pushCollab(); await pushShared(); } finally { ONLINE.pushing = false; }
+  if (ONLINE.pushAgain) { ONLINE.pushAgain = false; await pushAll(); }
 }
 
 /* ---------- Réception (serveur → local) ---------- */
