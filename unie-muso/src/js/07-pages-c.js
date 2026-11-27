@@ -43,10 +43,19 @@ PAGES.balance = function () {
   const B = balances(buildJournal(), p.from, p.to);
   const accs = Object.keys(B).map(Number).sort((a, b) => a - b);
   let t1 = 0, t2 = 0, t3 = 0, t4 = 0;
-  const rows = accs.map((a) => {
-    const b = B[a]; const s = b.d - b.c;
-    t1 += b.pd; t2 += b.pc; t3 += s > 0 ? s : 0; t4 += s < 0 ? -s : 0;
-    return '<tr><td class="code">' + a + '</td><td>' + esc(accLabel(a)) + '</td><td class="n">' + fmt(b.pd) + '</td><td class="n">' + fmt(b.pc) + '</td><td class="n">' + (s > 0 ? fmt(s) : '') + '</td><td class="n">' + (s < 0 ? fmt(-s) : '') + '</td></tr>';
+  // Comptes classés par classe (1 Actif → 5 Charges), avec un sous-total par classe
+  const rows = [];
+  [1, 2, 3, 4, 5].forEach((cl) => {
+    const list = accs.filter((a) => accClass(a) === cl); if (!list.length) return;
+    rows.push('<tr><td colspan="6" style="background:var(--navy-050);font-weight:700;color:var(--navy)">' + esc(ACCOUNT_CLASSES[cl]) + '</td></tr>');
+    let c1 = 0, c2 = 0, c3 = 0, c4 = 0;
+    list.forEach((a) => {
+      const b = B[a]; const s = b.d - b.c;
+      c1 += b.pd; c2 += b.pc; c3 += s > 0 ? s : 0; c4 += s < 0 ? -s : 0;
+      rows.push('<tr><td class="code">' + a + '</td><td>' + esc(accLabel(a)) + '</td><td class="n">' + fmt(b.pd) + '</td><td class="n">' + fmt(b.pc) + '</td><td class="n">' + (s > 0 ? fmt(s) : '') + '</td><td class="n">' + (s < 0 ? fmt(-s) : '') + '</td></tr>');
+    });
+    t1 += c1; t2 += c2; t3 += c3; t4 += c4;
+    rows.push('<tr><td></td><td class="muted"><i>Sous-total classe ' + cl + '</i></td><td class="n muted">' + fmt(c1) + '</td><td class="n muted">' + fmt(c2) + '</td><td class="n muted">' + (c3 ? fmt(c3) : '') + '</td><td class="n muted">' + (c4 ? fmt(c4) : '') + '</td></tr>');
   });
   return pageHead('Comptabilité', 'Balance de vérification', 'Mouvements de la période et soldes cumulés · ' + esc(periodText()), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
     '<section class="panel">' + periodBar() + table(['Compte', 'Intitulé', ['Débit période', 'n'], ['Crédit période', 'n'], ['Solde débiteur cumulé', 'n'], ['Solde créditeur cumulé', 'n']], rows,
@@ -55,10 +64,11 @@ PAGES.balance = function () {
 function bilanHTML(to) {
   const F = financials(null, to);
   const line = (x) => '<tr><td class="code">' + x.acc + '</td><td>' + esc(accLabel(x.acc)) + '</td><td class="n">' + fmt(x.v) + '</td></tr>';
-  const passifRows = F.passif.map(line).concat(F.capitaux.map(line));
   return '<div class="grid-2">' +
     panel('Actif', table(['Compte', 'Intitulé', ['Montant', 'n']], F.actif.map(line), '<tr><td colspan="2">Total actif</td><td class="n">' + fmt(F.totActif) + '</td></tr>'), { flush: true }) +
-    panel('Passif et capitaux propres', table(['Compte', 'Intitulé', ['Montant', 'n']], passifRows.length ? passifRows : ['<tr><td colspan="3" class="muted">Aucun passif</td></tr>'], '<tr><td colspan="2">Total passif + capitaux</td><td class="n">' + fmt(F.totPassif) + '</td></tr>'), { flush: true }) +
+    panel('Passif et capitaux propres', table(['Compte', 'Intitulé', ['Montant', 'n']],
+      ['<tr><td colspan="3" style="background:var(--navy-050);font-weight:700;color:var(--navy)">Passif (classe 2)</td></tr>'].concat(F.passif.length ? F.passif.map(line) : ['<tr><td colspan="3" class="muted">Aucune dette envers des tiers</td></tr>'])
+        .concat(['<tr><td colspan="3" style="background:var(--navy-050);font-weight:700;color:var(--navy)">Capitaux propres (classe 3)</td></tr>']).concat(F.capitaux.map(line)), '<tr><td colspan="2">Total passif + capitaux</td><td class="n">' + fmt(F.totPassif) + '</td></tr>'), { flush: true }) +
     '</div><div class="banner ' + (Math.abs(F.totActif - F.totPassif) < 0.01 ? 'soft' : 'import') + '"><span>' + (Math.abs(F.totActif - F.totPassif) < 0.01 ? 'Bilan équilibré.' : 'Écart de ' + money(F.totActif - F.totPassif)) + '</span></div>';
 }
 PAGES.bilan = function () {
@@ -386,7 +396,7 @@ PAGES.moncompte = function () {
       return '<tr><td class="code">#' + d.id + '</td><td>' + esc(nameOf(d.code_membre)) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + (n === undefined ? '<span class="badge b-orange">à donner</span>' : '<b class="num">' + fmt(n) + '/' + GRILLE.pts_comite + '</b>') + '</td>' +
         '<td class="act"><button class="btn btn-sm btn-accent" data-act="demEval" data-id="' + d.id + '">' + (n === undefined ? 'Donner ma note' : 'Voir / modifier') + '</button></td></tr>';
     })), { flush: true }) : '') +
-    memberResumePanel() + memberCommPanel(m) +
+    memberMeetingsPanel(m) + memberResumePanel() + memberCommPanel(m) +
     '<div class="kpis">' + kpi('Caisse Verte', fmt(s.verte) + ' <small>HTG</small>', 'mon épargne', 'green') + kpi('Caisse Rouge', fmt(s.rouge) + ' <small>HTG</small>', 'solidarité', 'red') +
       kpi('Total versé', fmt(s.total) + ' <small>HTG</small>', '', 'navy') + kpi('Reste dû', fmt(s.reste) + ' <small>HTG</small>', s.statut, s.reste ? 'orange' : 'green') + '</div>' +
     '<div class="grid-2"><div>' +
@@ -445,7 +455,7 @@ PAGES.parametres = function () {
   let body = '';
   if (tab === 'general') {
     body = '<form data-form="general" class="panel"><div class="panel-body"><div class="form-grid">' +
-      field('Langue / Lang', select('lang', [{ v: 'fr', l: 'Français' }, { v: 'kr', l: 'Kreyòl' }], SETTINGS.lang)) +
+      field('Langue par défaut / Lang pa defo', select('lang', [{ v: 'fr', l: 'Français' }, { v: 'kr', l: 'Kreyòl' }], SETTINGS.lang), '', 'Chaque personne choisit ensuite sa langue (FR / KR en haut de l’écran).') +
       field('Début de l’exercice comptable', input('fiscal_start', RULES.fiscal_start, 'type="date"'), '', 'Exercice actuel : ' + esc(fiscalLabel()) + '. Exercice de la mutuelle : 1er avril → 31 mars (indépendant de l’exercice fiscal haïtien).') +
       field('Démarrage de la mutuelle', input('mutuelle_start', RULES.mutuelle_start, 'type="date"')) +
       field('Heure de la réunion', input('meeting_hour', SETTINGS.meeting_hour, 'type="time"'), '', 'Dernier jeudi du mois.') +

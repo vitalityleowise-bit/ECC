@@ -15,11 +15,15 @@ const logo = fs.existsSync(logoPath) ? 'data:image/jpeg;base64,' + fs.readFileSy
 
 // Données réelles des membres : fichier privé, jamais versionné (voir .gitignore)
 const seedPath = path.join(src, 'private', 'seed.json');
+function readPrivate(name) { const f = path.join(src, 'private', name); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; }
 const privateSeed = fs.existsSync(seedPath) ? JSON.parse(fs.readFileSync(seedPath, 'utf8')) : null;
 if (!privateSeed) console.warn('Attention : src/private/seed.json absent — build sans données de membres.');
 
 const js = ['/* UNIE-MUSO — application autonome hors ligne */', 'const EMBEDDED_LOGO = ' + JSON.stringify(logo) + ';',
-  'const PRIVATE_SEED = ' + JSON.stringify(privateSeed) + ';']
+  'const PRIVATE_SEED = ' + JSON.stringify(privateSeed) + ';',
+  // Règles et paramètres de la mutuelle repris de la dernière sauvegarde du trésorier (fichiers privés)
+  'const PRIVATE_RULES = ' + JSON.stringify(readPrivate('rules.json')) + ';',
+  'const PRIVATE_SETTINGS = ' + JSON.stringify(readPrivate('settings.json')) + ';']
   .concat(jsFiles.map((f) => '/* ---- ' + f + ' ---- */\n' + fs.readFileSync(path.join(src, 'js', f), 'utf8')))
   .join('\n');
 // Le JS est enveloppé pour isoler la portée tout en gardant les fonctions globales utilisées par les attributs onclick

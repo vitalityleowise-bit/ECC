@@ -43,6 +43,9 @@ PAGES.reunions = function () {
           [['auto', 'Quorum automatique'], ['oui', 'Quorum : oui (décision)'], ['non', 'Quorum : non (décision)']].map((o) => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
       }
     }
+    const ex = (DB.reunions || []).find((x) => fmtD(x.date) === fmtD(r.date) && (x.type || 'ordinaire') === (r.type || 'ordinaire'));
+    act += odjButton(ex);
+    if (canEdit()) act += '<button class="btn btn-sm" data-act="reunionEdit" data-id="' + toISO(r.date) + '|' + esc(r.type || 'ordinaire') + '">' + (ex && ex.odj ? t('edit') : 'Ordre du jour / ' + t('edit').toLowerCase()) + '</button>';
     if (!r.auto && canEdit()) act += '<button class="btn btn-sm btn-danger" data-act="reunionDel" data-id="' + esc(k + '|' + (r.type || '')) + '">' + t('del') + '</button>';
     const type = (REUNION_TYPES.find((x) => x.v === (r.type || 'ordinaire')) || REUNION_TYPES[0]).l;
     return '<tr><td class="num">' + esc(longDate(r.date)) + '<div class="muted" style="font-size:11px">' + esc((r.heure || SETTINGS.meeting_hour) + (r.lieu ? ' · ' + r.lieu : '')) + '</div></td>' +
@@ -61,18 +64,65 @@ ACTIONS.quorumSet = (iso, el) => {
   if (!r) { r = { date: d, type: 'ordinaire' }; DB.reunions.push(r); }
   r.quorum = el.value; saveDB(); toast('Décision sur le quorum enregistrée.', 'ok'); render();
 };
-ACTIONS.reunionNew = () => openModal({
-  title: 'Programmer une réunion', submit: t('save'),
-  body: '<div class="form-grid">' + field('Type', select('type', REUNION_TYPES, 'extraordinaire')) + field(t('date'), input('date', toISO(today()), 'type="date" required')) +
-    field('Heure', input('heure', SETTINGS.meeting_hour, 'type="time"')) + field('Lieu', input('lieu', '')) + field('Objet / ordre du jour', '<textarea name="objet"></textarea>', 'full') + '</div>' +
-    '<div class="muted" style="margin-top:8px">Les réunions du comité sont programmées par la présidente. Les convocations par notification, avec confirmation de présence et relances, arriveront avec la version en ligne.</div>',
-  onSubmit: (v) => {
-    if (!parseD(v.date)) { toast('Date invalide.', 'err'); return false; }
-    DB.reunions = DB.reunions || [];
-    DB.reunions.push({ date: fmtD(v.date), type: v.type, heure: v.heure, lieu: v.lieu.trim(), objet: v.objet.trim(), quorum: 'auto', par: mySelfCode() || SESSION.id });
-    saveDB(); toast('Réunion programmée le ' + fmtD(v.date) + '.', 'ok'); render();
-  },
+/* Formulaire de réunion avec fichier d'ordre du jour (photo ou PDF) */
+function reunionForm(r) {
+  r = r || { type: 'extraordinaire', date: fmtD(today()), heure: SETTINGS.meeting_hour, lieu: '', objet: '' };
+  return '<div class="form-grid">' + field('Type', select('type', REUNION_TYPES, r.type || 'ordinaire')) + field(t('date'), input('date', toISO(r.date), 'type="date" required')) +
+    field('Heure', input('heure', r.heure || SETTINGS.meeting_hour, 'type="time"')) + field('Lieu', input('lieu', r.lieu || '')) +
+    field('Objet / ordre du jour (texte)', '<textarea name="objet">' + esc(r.objet || '') + '</textarea>', 'full') +
+    '<div class="full" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn btn-sm" data-act="odjPick">Joindre le fichier de l’ordre du jour</button>' +
+      '<span id="odj-state" class="muted">' + (r.odj ? esc(r.odj.name) + ' (' + Math.round(r.odj.data.length * 0.75 / 1024) + ' Ko)' : 'Aucun fichier — photo ou PDF') + '</span>' +
+      '<input type="hidden" name="odj" value="' + esc(r.odj ? JSON.stringify(r.odj) : '') + '"></div></div>' +
+    '<div class="muted" style="margin-top:8px">Les réunions du comité sont programmées par la présidente. Les convocations par notification, avec confirmation de présence et relances, arriveront avec la version en ligne.</div>';
+}
+function saveReunion(v, existing) {
+  if (!parseD(v.date)) { toast('Date invalide.', 'err'); return false; }
+  DB.reunions = DB.reunions || [];
+  const rec = Object.assign(existing || { quorum: 'auto', par: mySelfCode() || SESSION.id }, {
+    date: fmtD(v.date), type: v.type, heure: v.heure, lieu: v.lieu.trim(), objet: v.objet.trim(), odj: v.odj ? JSON.parse(v.odj) : null,
+  });
+  if (!existing) DB.reunions.push(rec);
+  if (!saveDB()) return false;
+  toast('Réunion du ' + rec.date + ' enregistrée' + (rec.odj ? ' avec son ordre du jour.' : '.'), 'ok'); render();
+}
+ACTIONS.reunionNew = () => openModal({ title: 'Programmer une réunion', submit: t('save'), body: reunionForm(), onSubmit: (v) => saveReunion(v) });
+/* Modifier une réunion (ou ajouter l'ordre du jour d'une réunion mensuelle) : clé « date ISO|type » */
+ACTIONS.reunionEdit = (key) => {
+  const [iso, type] = key.split('|'); const k = fmtD(iso);
+  const ex = (DB.reunions || []).find((r) => fmtD(r.date) === k && (r.type || 'ordinaire') === (type || 'ordinaire'));
+  openModal({ title: 'Réunion du ' + k, submit: t('save'), body: reunionForm(ex || { type: type || 'ordinaire', date: k, heure: SETTINGS.meeting_hour }), onSubmit: (v) => saveReunion(v, ex) });
+};
+ACTIONS.odjPick = () => pickFile('image/*,application/pdf', (f) => {
+  const done = (data) => {
+    const form = document.querySelector('#modal form'); if (!form) return;
+    form.odj.value = JSON.stringify({ name: f.name, type: f.type || 'application/octet-stream', data });
+    document.getElementById('odj-state').textContent = f.name + ' (' + Math.round(data.length * 0.75 / 1024) + ' Ko)';
+  };
+  if (/^image\//.test(f.type)) { readImage(f, 1800, 0.8).then(done).catch((e) => toast(e.message, 'err')); return; }
+  if (f.size > 1.5 * 1024 * 1024) { toast('PDF trop lourd (1,5 Mo maximum). Prenez plutôt une photo de l’ordre du jour.', 'err'); return; }
+  const r = new FileReader(); r.onload = () => done(r.result); r.onerror = () => toast('Lecture impossible.', 'err'); r.readAsDataURL(f);
 });
+function dataUrlToBlob(u) {
+  const [h, b64] = String(u).split(','); const mime = (h.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+  const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+/* Ouvrir l'ordre du jour : image affichée ; PDF ouvert ou téléchargé */
+ACTIONS.odjOpen = (i) => {
+  const r = DB.reunions[+i]; if (!r || !r.odj) return;
+  if (/^image\//.test(r.odj.type)) { openModal({ title: 'Ordre du jour — ' + r.date, wide: true, body: '<img alt="Ordre du jour" style="max-width:100%;border:1px solid var(--line)" src="' + r.odj.data + '">' }); return; }
+  const url = URL.createObjectURL(dataUrlToBlob(r.odj.data));
+  const a = document.createElement('a'); a.href = url; a.download = r.odj.name || 'ordre-du-jour.pdf'; a.target = '_blank';
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+};
+function odjButton(r) { const i = (DB.reunions || []).indexOf(r); return r && r.odj && i >= 0 ? '<button class="btn btn-sm btn-accent" data-act="odjOpen" data-id="' + i + '">Ordre du jour</button>' : ''; }
+/* « Mon compte » : prochaines réunions (et celles du comité pour ses membres) */
+function memberMeetingsPanel(m) {
+  const up = (DB.reunions || []).filter((r) => parseD(r.date) >= today() && (r.type !== 'comite' || m.is_comite)).sort((a, b) => parseD(a.date) - parseD(b.date));
+  if (!up.length) return '';
+  return panel('Réunions programmées', table(['Date', 'Type', 'Lieu', ''], up.map((r) => '<tr><td class="num">' + esc(longDate(r.date)) + ' · ' + esc(r.heure || '') + '</td><td>' + esc((REUNION_TYPES.find((x) => x.v === r.type) || REUNION_TYPES[0]).l) +
+    (r.objet ? '<div class="muted" style="font-size:11px;white-space:pre-wrap">' + esc(r.objet) + '</div>' : '') + '</td><td>' + esc(r.lieu || '') + '</td><td class="act">' + odjButton(r) + '</td></tr>')), { flush: true });
+}
 ACTIONS.reunionDel = (key) => {
   const [k, type] = key.split('|');
   confirmBox('Supprimer la réunion', 'Supprimer la réunion programmée du ' + esc(k.replace('-c', '')) + ' ?', () => {
@@ -93,35 +143,56 @@ function reportRange(key) {
   return { from, to, carried, invalid, meet };
 }
 
-/* ---------- Caisse Bleue (dons, subventions) ---------- */
-PAGES.caissebleue = function () {
+/* ---------- Dons et subventions ----------
+   Reçus par la mutuelle (produit 4060) ou accordés par la mutuelle (charge 5050). */
+const DON_SENS = [{ v: 'recu', l: 'Reçu par la mutuelle' }, { v: 'accorde', l: 'Accordé par la mutuelle' }];
+PAGES.dons = function () {
   const list = (DB.dons || []).map((d, i) => Object.assign({ i }, d)).sort((a, b) => parseD(b.date) - parseD(a.date));
-  const total = sum(list, (d) => d.montant);
-  return pageHead('Trésorerie', t('caissebleue'), 'Statuts art. 25.3 : fonds reçus de l’extérieur (dons, subventions) pour renforcer la mutuelle',
-    canEdit() ? '<button class="btn btn-primary" data-act="donNew">Enregistrer un don</button>' : '') +
-    '<div class="kpis">' + kpi('Caisse Bleue', fmt(total) + ' <small>HTG</small>', list.length + ' don(s)', 'navy') + '</div>' +
-    '<section class="panel">' + table(['Date', 'Donateur', 'Nature', 'Mode', ['Montant', 'n'], ''], list.map((d) =>
-      '<tr><td class="num">' + esc(d.date) + '</td><td>' + esc(d.donateur || '') + '</td><td>' + esc(d.nature || 'Don') + (d.note ? '<div class="muted" style="font-size:11px">' + esc(d.note) + '</div>' : '') + '</td>' +
+  const recus = list.filter((d) => d.sens !== 'accorde'); const acc = list.filter((d) => d.sens === 'accorde');
+  return pageHead('Gestion', t('dons'), 'Un don ou une subvention reçu par la mutuelle (compte 4060), ou accordé par la mutuelle (compte 5050)',
+    canEdit() ? '<button class="btn" data-act="donNew" data-id="accorde">Don accordé par la mutuelle</button><button class="btn btn-primary" data-act="donNew" data-id="recu">Don reçu par la mutuelle</button>' : '') +
+    '<div class="kpis">' + kpi('Reçus', fmt(sum(recus, (d) => d.montant)) + ' <small>HTG</small>', recus.length + ' don(s) / subvention(s)', 'green') +
+      kpi('Accordés', fmt(sum(acc, (d) => d.montant)) + ' <small>HTG</small>', acc.length + ' don(s)', 'orange') + '</div>' +
+    '<section class="panel">' + table(['Date', 'Sens', 'Nature', 'Donateur / bénéficiaire', 'Mode', ['Montant', 'n'], ''], list.map((d) =>
+      '<tr><td class="num">' + esc(d.date) + '</td><td>' + (d.sens === 'accorde' ? '<span class="badge b-orange">Accordé</span>' : '<span class="badge b-green">Reçu</span>') + '</td>' +
+      '<td>' + esc(d.nature || 'Don') + (d.note ? '<div class="muted" style="font-size:11px">' + esc(d.note) + '</div>' : '') + '</td><td>' + esc(d.tiers || d.donateur || '') + '</td>' +
       '<td>' + esc(d.mode || BANK) + '</td><td class="n">' + fmt(d.montant) + '</td><td class="act">' +
-      (canEdit() ? '<button class="btn btn-sm" data-act="donEdit" data-id="' + d.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="donDel" data-id="' + d.i + '">' + t('del') + '</button>' : '') + '</td></tr>'),
-      '<tr><td colspan="4">Total</td><td class="n">' + fmt(total) + '</td><td></td></tr>') +
-    '<div class="section-note">Le compte comptable de la Caisse Bleue sera ajusté selon le plan comptable de la mutuelle.</div></section>';
+      (canEdit() ? '<button class="btn btn-sm" data-act="donEdit" data-id="' + d.i + '">' + t('edit') + '</button><button class="btn btn-sm btn-danger" data-act="donDel" data-id="' + d.i + '">' + t('del') + '</button>' : '') + '</td></tr>')) + '</section>';
 };
 function donForm(d) {
-  d = d || { date: fmtD(today()), nature: 'Don', mode: BANK };
-  return '<div class="form-grid">' + field(t('date'), input('date', toISO(d.date), 'type="date"')) + field('Donateur', input('donateur', d.donateur || '', 'required')) +
+  d = d || { date: fmtD(today()), nature: 'Don', mode: BANK, sens: 'recu' };
+  return '<div class="form-grid">' + field('Sens', select('sens', DON_SENS, d.sens || 'recu')) + field(t('date'), input('date', toISO(d.date), 'type="date"')) +
     field('Nature', select('nature', ['Don', 'Subvention', 'Don en matériel'], d.nature)) + field(t('amount') + ' (HTG)', input('montant', d.montant || '', 'type="number" min="0" step="any"')) +
-    field('Mode', select('mode', [BANK, CASH], d.mode || BANK)) + field('Note', input('note', d.note || ''), 'full') + '</div>';
+    field('Donateur ou bénéficiaire', input('tiers', d.tiers || d.donateur || '', 'required'), 'full', 'Qui donne à la mutuelle, ou à qui la mutuelle donne (membre ou organisation).') +
+    field('Mode', select('mode', [BANK, CASH], d.mode || BANK)) + field('Note', input('note', d.note || '')) + '</div>';
 }
 function saveDon(v, i) {
-  if (num(v.montant) <= 0 || !v.donateur.trim()) { toast('Donateur et montant obligatoires.', 'err'); return false; }
-  const rec = { date: fmtD(v.date), donateur: v.donateur.trim(), nature: v.nature, montant: num(v.montant), mode: v.mode, note: v.note.trim() };
+  if (num(v.montant) <= 0 || !v.tiers.trim()) { toast('Donateur / bénéficiaire et montant obligatoires.', 'err'); return false; }
+  const rec = { date: fmtD(v.date), sens: v.sens, tiers: v.tiers.trim(), nature: v.nature, montant: num(v.montant), mode: v.mode, note: v.note.trim() };
   DB.dons = DB.dons || []; if (i === undefined) DB.dons.push(rec); else DB.dons[i] = rec;
-  saveDB(); toast('Don enregistré en Caisse Bleue.', 'ok'); render();
+  saveDB(); toast(v.sens === 'accorde' ? 'Don accordé enregistré.' : 'Don reçu enregistré.', 'ok'); render();
 }
-ACTIONS.donNew = () => openModal({ title: 'Enregistrer un don', body: donForm(), submit: t('save'), onSubmit: (v) => saveDon(v) });
-ACTIONS.donEdit = (i) => openModal({ title: 'Modifier le don', body: donForm(DB.dons[+i]), submit: t('save'), onSubmit: (v) => saveDon(v, +i) });
-ACTIONS.donDel = (i) => confirmBox('Supprimer le don', 'Supprimer ce don de ' + money(DB.dons[+i].montant) + ' ?', () => { DB.dons.splice(+i, 1); saveDB(); render(); }, t('del'));
+ACTIONS.donNew = (sens) => openModal({ title: sens === 'accorde' ? 'Don accordé par la mutuelle' : 'Don ou subvention reçu', body: donForm({ date: fmtD(today()), nature: 'Don', mode: BANK, sens: sens || 'recu' }), submit: t('save'), onSubmit: (v) => saveDon(v) });
+ACTIONS.donEdit = (i) => openModal({ title: 'Modifier', body: donForm(DB.dons[+i]), submit: t('save'), onSubmit: (v) => saveDon(v, +i) });
+ACTIONS.donDel = (i) => confirmBox('Supprimer', 'Supprimer ce don de ' + money(DB.dons[+i].montant) + ' ?', () => { DB.dons.splice(+i, 1); saveDB(); render(); }, t('del'));
+
+/* ---------- Plan comptable ---------- */
+PAGES.plancomptable = function () {
+  const B = balances(buildJournal(), null, null); const F = financials();
+  const rows = [];
+  [1, 2, 3, 4, 5].forEach((cl) => {
+    rows.push('<tr><td colspan="4" style="background:var(--navy);color:#fff;font-weight:700">' + esc(ACCOUNT_CLASSES[cl]) + '</td></tr>');
+    Object.keys(ACCOUNTS).map(Number).filter((a) => accClass(a) === cl).sort((a, b) => a - b).forEach((a) => {
+      let v = B[a] ? B[a].d - B[a].c : 0;
+      if (a === 3090) v = -F.resultatCum;
+      const shown = cl === 1 || cl === 5 ? v : -v;
+      rows.push('<tr><td class="code">' + a + '</td><td>' + esc(ACCOUNTS[a]) + '</td><td class="muted">' + esc(ACCOUNT_USAGE[a] || '') + '</td><td class="n">' + (shown ? fmt(shown) : '—') + '</td></tr>');
+    });
+  });
+  return pageHead('Comptabilité', t('plancomptable'), 'Classes du plan comptable haïtien · soldes cumulés au ' + fmtD(today()), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
+    '<section class="panel">' + table(['Compte', 'Intitulé', 'Utilisation', ['Solde', 'n']], rows) +
+    '<div class="section-note">Les produits (classe 4) et les charges (classe 5) ne sont jamais portés en capital : seul le résultat de l’exercice (3090 = produits − charges) apparaît dans les capitaux propres du bilan.</div></section>';
+};
 
 /* ---------- Messages et suggestions ----------
    Un membre écrit au comité ; les membres du comité voient le message, répondent ; on voit qui a écrit et qui a répondu. */
@@ -211,14 +282,13 @@ function showWelcome() {
   const name = currentName(); const d = nextMeeting();
   const el = document.createElement('div'); el.id = 'welcome'; el.className = 'welcome';
   el.innerHTML = '<div class="welcome-card">' + logoImg('welcome-logo') +
-    '<div class="welcome-hello">' + (SETTINGS.lang === 'kr' ? 'Byenvini' : 'Bienvenue') + '</div>' +
+    '<div class="welcome-hello">' + (currentLang() === 'kr' ? 'Byenvini' : 'Bienvenue') + '</div>' +
     '<div class="welcome-name">' + esc(name) + '</div>' +
     '<div class="welcome-line"></div>' +
     '<div class="welcome-sub">UNIE-MUSO · Unie Mutuelle Solidarité</div>' +
     '<div class="welcome-meet">' + t('next_meeting') + ' : <b>' + esc(longDate(d)) + '</b> · ' + esc(SETTINGS.meeting_hour) + '</div>' +
-    '<button class="btn btn-accent" data-close-welcome>' + (SETTINGS.lang === 'kr' ? 'Antre' : 'Entrer') + '</button></div>';
+    '<button class="btn btn-accent" data-close-welcome>' + (currentLang() === 'kr' ? 'Antre' : 'Entrer') + '</button></div>';
   document.body.appendChild(el);
-  const close = () => { el.classList.add('out'); setTimeout(() => el.remove(), 350); };
-  el.addEventListener('click', close);
-  setTimeout(close, 3500);
+  // L'image reste affichée jusqu'à ce que la personne touche « Entrer »
+  el.querySelector('[data-close-welcome]').addEventListener('click', () => { el.classList.add('out'); setTimeout(() => el.remove(), 350); });
 }

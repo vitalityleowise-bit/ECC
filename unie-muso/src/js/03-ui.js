@@ -3,7 +3,7 @@
    ========================================================================= */
 const I18N = {
   fr: {
-    g_gestion: 'Gestion', g_compte: 'Mon compte', g_comm: 'Communication', reunions: 'Réunions et quorum', messages: 'Messages et suggestions', caissebleue: 'Caisse Bleue', g_treso: 'Trésorerie', g_compta: 'Comptabilité', g_rapports: 'Rapports', g_docs: 'Documents', g_outils: 'Outils',
+    g_gestion: 'Gestion', g_compte: 'Mon compte', g_comm: 'Communication', reunions: 'Réunions et quorum', messages: 'Messages et suggestions', dons: 'Dons et subventions', plancomptable: 'Plan comptable', g_treso: 'Trésorerie', g_compta: 'Comptabilité', g_rapports: 'Rapports', g_docs: 'Documents', g_outils: 'Outils',
     dashboard: 'Tableau de bord', membres: 'Membres', cotisations: 'Cotisations', previsions: 'Prévisions', prets: 'Prêts & remboursements',
     demandes: 'Demandes de prêt', grille: 'Grille de crédit', depenses: 'Dépenses', stats: 'Statistiques', moncompte: 'Mon compte',
     caisse: 'Caisse', banque: 'Banque', journal: 'Journal', balance: 'Balance', bilan: 'Bilan', resultats: 'État résultats',
@@ -16,7 +16,7 @@ const I18N = {
     tagline: 'Mutuelle de solidarité — épargne, crédit et entraide entre membres.',
   },
   kr: {
-    g_gestion: 'Jesyon', g_compte: 'Kont mwen', g_comm: 'Kominikasyon', reunions: 'Reyinyon ak kowòm', messages: 'Mesaj ak sijesyon', caissebleue: 'Kès Ble', g_treso: 'Trezori', g_compta: 'Kontablite', g_rapports: 'Rapò', g_docs: 'Dokiman', g_outils: 'Zouti',
+    g_gestion: 'Jesyon', g_compte: 'Kont mwen', g_comm: 'Kominikasyon', reunions: 'Reyinyon ak kowòm', messages: 'Mesaj ak sijesyon', dons: 'Don ak sibvansyon', plancomptable: 'Plan kontab', g_treso: 'Trezori', g_compta: 'Kontablite', g_rapports: 'Rapò', g_docs: 'Dokiman', g_outils: 'Zouti',
     dashboard: 'Tablo jeneral', membres: 'Manm yo', cotisations: 'Kotizasyon', previsions: 'Previzyon', prets: 'Prè ak ranbousman',
     demandes: 'Demann prè', grille: 'Grid kredi', depenses: 'Depans', stats: 'Estatistik', moncompte: 'Kont mwen',
     caisse: 'Kès', banque: 'Bank', journal: 'Jounal', balance: 'Balans', bilan: 'Bilan', resultats: 'Rezilta',
@@ -30,7 +30,7 @@ const I18N = {
   },
 };
 function t(k, vars) {
-  const dict = I18N[SETTINGS && SETTINGS.lang === 'kr' ? 'kr' : 'fr'];
+  const dict = I18N[currentLang() === 'kr' ? 'kr' : 'fr'];
   let s = dict[k] || I18N.fr[k] || k;
   if (vars) Object.keys(vars).forEach((v) => { s = s.replace('{' + v + '}', vars[v]); });
   return s;
@@ -153,12 +153,13 @@ const PAGE_DEFS = [
   { id: 'demandes', g: 'g_gestion', roles: ['admin', 'editeur', 'comite:demandes'] },
   { id: 'grille', g: 'g_gestion', roles: ['admin', 'editeur'] },
   { id: 'depenses', g: 'g_gestion', roles: ['admin', 'editeur'] },
+  { id: 'dons', g: 'g_gestion', roles: ['admin', 'editeur'] },
   { id: 'stats', g: 'g_gestion', roles: ['admin', 'editeur'] },
   { id: 'moncompte', g: 'g_compte', roles: ['membre', 'comite', 'editeur'] },
   { id: 'messages', g: 'g_comm', roles: ['admin', 'editeur', 'comite'] },
   { id: 'caisse', g: 'g_treso', roles: ['admin', 'editeur'] },
   { id: 'banque', g: 'g_treso', roles: ['admin', 'editeur'] },
-  { id: 'caissebleue', g: 'g_treso', roles: ['admin', 'editeur'] },
+  { id: 'plancomptable', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
   { id: 'journal', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
   { id: 'balance', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
   { id: 'bilan', g: 'g_compta', roles: ['admin', 'editeur', 'comite:compta'] },
@@ -204,6 +205,7 @@ function renderLogin() {
         '<h1>UNIE-MUSO</h1><p>' + esc(t('tagline')) + '</p></div>' +
         '<div class="place">Petit-Goâve · Haïti</div></div>' +
       '<div class="login-form-wrap"><form class="login-form" id="lg-form" autocomplete="on">' +
+        '<div class="lang-switch" style="float:right">' + ['fr', 'kr'].map((l) => '<button type="button" class="' + (currentLang() === l ? 'on' : '') + '" data-act="setLang" data-id="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</div>' +
         '<h2>' + t('login_title') + '</h2>' +
         '<label for="lg-id">' + t('login_id') + '</label>' +
         '<input id="lg-id" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">' +
@@ -238,9 +240,17 @@ function sidebarHTML() {
   const u = SESSION.type === 'user' ? USERS[SESSION.id] : null; const m = currentMember();
   return '<aside class="sidebar" aria-label="Navigation">' +
     '<div class="sb-brand">' + logoImg() + '<div><div class="t">UNIE-MUSO</div><div class="s">Petit-Goâve</div></div></div>' +
-    groups.map((g) => '<div class="sb-group"><div class="sb-group-title">' + t(g.g) + '</div>' +
-      g.items.map((p) => '<button class="sb-link' + (STATE.page === p.id ? ' active' : '') + '" data-go="' + p.id + '">' + t(p.id) +
-        (p.id === 'demandes' && pending ? '<span class="count">' + pending + '</span>' : '') + '</button>').join('') + '</div>').join('') +
+    groups.map((g) => {
+      const link = (p, sub) => '<button class="sb-link' + (sub ? ' sb-sub' : '') + (STATE.page === p.id ? ' active' : '') + '" data-go="' + p.id + '">' + t(p.id) +
+        (p.id === 'demandes' && pending ? '<span class="count">' + pending + '</span>' : '') + '</button>';
+      // Comptabilité : un seul bouton qui déroule Plan comptable, Journal, Balance, Bilan, État des résultats
+      if (g.g === 'g_compta') {
+        const open = STATE.openCompta || g.items.some((p) => p.id === STATE.page);
+        return '<div class="sb-group"><button class="sb-link sb-toggle' + (open ? ' open' : '') + '" data-act="toggleCompta" aria-expanded="' + open + '">' + t('g_compta') + '<span class="chev">' + (open ? '▾' : '▸') + '</span></button>' +
+          (open ? g.items.map((p) => link(p, true)).join('') : '') + '</div>';
+      }
+      return '<div class="sb-group"><div class="sb-group-title">' + t(g.g) + '</div>' + g.items.map((p) => link(p)).join('') + '</div>';
+    }).join('') +
     '<div class="sb-foot"><div class="who">' + esc(currentName()) + '</div><div class="role">' +
       esc((u && u.position) || (m && m.comite_poste) || roleLabel) + (m ? ' · ' + m.code : '') + '</div>' +
       '<button data-logout>' + t('logout') + '</button></div></aside><div class="sb-overlay" data-menu-close></div>';
@@ -262,6 +272,7 @@ function render() {
       '<div class="main"><header class="topbar">' +
         '<button class="mobile-topbar-btn" data-menu aria-label="Menu">☰</button>' +
         '<div class="crumb">' + esc(crumbGroup) + ' / <b>' + esc(t(STATE.page)) + '</b></div><div class="spacer"></div>' +
+        '<div class="lang-switch" role="group" aria-label="Langue">' + ['fr', 'kr'].map((l) => '<button class="' + (currentLang() === l ? 'on' : '') + '" data-act="setLang" data-id="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</div>' +
         '<div class="today">' + esc(longDate(today())) + '</div></header>' +
         '<main class="content" id="content">' + html + '</main></div></div>';
   bindGlobal();
@@ -274,8 +285,16 @@ function bindGlobal() {
   const mb = root.querySelector('[data-menu]'); if (mb) mb.addEventListener('click', () => root.querySelector('.app').classList.toggle('menu-open'));
   const mc = root.querySelector('[data-menu-close]'); if (mc) mc.addEventListener('click', () => root.querySelector('.app').classList.remove('menu-open'));
 }
+/* Choix de la langue pour soi seul : enregistré sur sa fiche (membre) ou son compte (gestion) */
+function setMyLang(l) {
+  store.rawSet(LANG_KEY, l);
+  if (SESSION && SESSION.type === 'member') { const m = getMember(SESSION.code); if (m) { m.lang = l; saveDB(); } }
+  else if (SESSION && USERS[SESSION.id]) { USERS[SESSION.id].lang = l; saveUsers(); }
+}
 /* Délégation d'événements : data-act="nom" data-id="..." */
 const ACTIONS = {};
+ACTIONS.toggleCompta = () => { STATE.openCompta = !(STATE.openCompta || PAGE_DEFS.some((p) => p.g === 'g_compta' && p.id === STATE.page)); render(); };
+ACTIONS.setLang = (l) => { setMyLang(l); SESSION ? render() : renderLogin(); };
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el) return;

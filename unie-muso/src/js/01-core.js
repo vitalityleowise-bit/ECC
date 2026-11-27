@@ -130,9 +130,9 @@ function loadAll() {
   if (USERS.admin && USERS.admin.member_code === undefined && /PATRICE/i.test(USERS.admin.fullname || '')) USERS.admin.member_code = 'M011';
   // Plus de compte « caissier » : seuls le trésorier (admin) et un membre du comité choisi peuvent modifier
   Object.keys(USERS).forEach((k) => { if (USERS[k].role === 'caissier') delete USERS[k]; });
-  RULES = migrateRules(store.get(KEYS.rules, null));
+  RULES = migrateRules(store.get(KEYS.rules, typeof PRIVATE_RULES !== 'undefined' ? PRIVATE_RULES : null));
   GRILLE = migrateGrille(store.get(KEYS.grille, DEFAULT_GRILLE));
-  SETTINGS = Object.assign(clone(DEFAULT_SETTINGS), store.get(KEYS.settings, DEFAULT_SETTINGS));
+  SETTINGS = Object.assign(clone(DEFAULT_SETTINGS), typeof PRIVATE_SETTINGS !== 'undefined' && PRIVATE_SETTINGS ? PRIVATE_SETTINGS : {}, store.get(KEYS.settings, {}));
   DOCS = store.get(KEYS.docs, DEFAULT_DOCS);
 }
 /* Une ancienne grille (pondérations 40/30/20/10) est remplacée par la grille officielle */
@@ -161,8 +161,9 @@ function fmt(n) {
   n = round2(num(n));
   const neg = n < 0; n = Math.abs(n);
   const int = Math.floor(n); const dec = Math.round((n - int) * 100);
-  const s = String(int).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return (neg ? '−' : '') + s + (dec ? ',' + String(dec).padStart(2, '0') : '');
+  // Espace insécable ordinaire et signe moins simple : présents dans la police embarquée
+  const s = String(int).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+  return (neg ? '-' : '') + s + (dec ? ',' + String(dec).padStart(2, '0') : '');
 }
 function money(n) { return fmt(n) + ' HTG'; }
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -183,16 +184,29 @@ function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 8640000
 function monthKey(d) { d = parseD(d); return d ? d.getFullYear() + '-' + pad(d.getMonth() + 1) : ''; }
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MWA = ['janvye', 'fevriye', 'mas', 'avril', 'me', 'jen', 'jiyè', 'out', 'septanm', 'oktòb', 'novanm', 'desanm'];
+/* Langue propre à chaque personne connectée (fiche membre ou compte de gestion) ; sinon celle de l'appareil */
+const LANG_KEY = 'uniemuso-lang';
+function currentLang() {
+  try {
+    if (typeof SESSION !== 'undefined' && SESSION) {
+      if (SESSION.type === 'member') { const m = getMember(SESSION.code); if (m && m.lang) return m.lang; }
+      else if (USERS && USERS[SESSION.id] && USERS[SESSION.id].lang) return USERS[SESSION.id].lang;
+      // Connecté sans choix personnel : langue par défaut de la mutuelle (pas celle de la personne précédente)
+      return (SETTINGS && SETTINGS.lang) || 'fr';
+    }
+  } catch (_e) { /* démarrage */ }
+  return store.raw(LANG_KEY) || (SETTINGS && SETTINGS.lang) || 'fr';
+}
 function monthLabel(key, short) {
   const [y, m] = key.split('-').map(Number);
-  const names = SETTINGS && SETTINGS.lang === 'kr' ? MWA : MOIS;
+  const names = currentLang() === 'kr' ? MWA : MOIS;
   const n = names[m - 1];
   return short ? n.slice(0, 3) + '. ' + String(y).slice(2) : n.charAt(0).toUpperCase() + n.slice(1) + ' ' + y;
 }
 function longDate(d) {
   d = parseD(d); if (!d) return '';
-  const jours = SETTINGS.lang === 'kr' ? ['dimanch', 'lendi', 'madi', 'mèkredi', 'jedi', 'vandredi', 'samdi'] : ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-  const names = SETTINGS.lang === 'kr' ? MWA : MOIS;
+  const jours = currentLang() === 'kr' ? ['dimanch', 'lendi', 'madi', 'mèkredi', 'jedi', 'vandredi', 'samdi'] : ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  const names = currentLang() === 'kr' ? MWA : MOIS;
   return jours[d.getDay()] + ' ' + d.getDate() + ' ' + names[d.getMonth()] + ' ' + d.getFullYear();
 }
 function addMonths(d, n) { d = parseD(d); return new Date(d.getFullYear(), d.getMonth() + n, 1); }

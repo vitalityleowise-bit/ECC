@@ -98,8 +98,7 @@ PAGES.dashboard = function () {
           '<dt>Caisse Verte</dt><dd class="num">' + money(T.verteFonds) + '</dd>' +
           '<dt>— prêtée</dt><dd class="num">' + money(T.prets) + '</dd>' +
           '<dt>— disponible</dt><dd class="num">' + money(T.verteDispo) + '</dd>' +
-          '<dt>Caisse Rouge</dt><dd class="num">' + money(T.rougeFonds) + '</dd>' +
-          '<dt>Caisse Bleue</dt><dd class="num">' + money(T.bleueFonds) + '</dd></dl>') +
+          '<dt>Caisse Rouge</dt><dd class="num">' + money(T.rougeFonds) + '</dd></dl>') +
       '</div>' +
     '</div>' +
     panel('Activité récente', table(['Date', 'Pièce', 'Libellé', ['Montant', 'n']], recent.map((e) =>

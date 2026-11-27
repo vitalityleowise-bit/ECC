@@ -253,13 +253,27 @@ function evaluateDemande(d) {
 }
 
 /* ---------- Comptabilité : plan comptable et journal ---------- */
+/* Plan comptable UNIE-MUSO (classes du plan comptable haïtien).
+   Les produits (classe 4) et les charges (classe 5) ne vont jamais en capital : seul leur solde net
+   (le résultat de l'exercice, compte 3090) apparaît dans les capitaux propres du bilan. */
+const ACCOUNT_CLASSES = { 1: 'Classe 1 — Actif', 2: 'Classe 2 — Passif', 3: 'Classe 3 — Capitaux propres', 4: 'Classe 4 — Produits', 5: 'Classe 5 — Charges' };
 const ACCOUNTS = {
-  1010: 'Encaisse (liquidité)', 1020: 'Banque CAP-AIDER', 1210: 'Prêts aux membres',
-  3010: 'CAISSE VERTE — épargne des membres', 3020: 'CAISSE BLEUE — dons et subventions', 3090: 'Résultat de l’exercice',
-  4010: 'Frais d’inscription', 4020: 'Cotisations Caisse Rouge', 4030: 'Amendes',
-  4040: 'Intérêts sur prêts', 4050: 'Pénalités sur prêts',
-  5010: 'Frais administratifs', 5020: 'CAISSE ROUGE — solidarité / secours', 5030: 'Frais bancaires CAP-AIDER',
-  5040: 'Frais de réunion', 5090: 'Autres charges',
+  1010: 'Encaisse (caisse)', 1020: 'Banque CAP-AIDER', 1210: 'Prêts aux membres',
+  2010: 'Dettes envers des tiers',
+  3010: 'Caisse Verte — épargne des membres', 3050: 'Fonds de réserve', 3090: 'Résultat de l’exercice',
+  4010: 'Frais d’inscription', 4020: 'Cotisations Caisse Rouge (solidarité)', 4030: 'Amendes',
+  4040: 'Intérêts sur prêts', 4050: 'Pénalités sur prêts', 4060: 'Dons et subventions reçus', 4090: 'Autres produits',
+  5010: 'Frais administratifs', 5020: 'Secours de solidarité (Caisse Rouge)', 5030: 'Frais bancaires CAP-AIDER',
+  5040: 'Frais de réunion', 5050: 'Dons et subventions accordés', 5090: 'Autres charges',
+};
+const ACCOUNT_USAGE = {
+  1010: 'Argent liquide en caisse (normalement zéro).', 1020: 'Compte de la mutuelle à CAP-AIDER.', 1210: 'Capital restant dû par les membres emprunteurs.',
+  2010: 'Sommes dues à des personnes extérieures (aucune pour le moment).',
+  3010: 'Cotisations Caisse Verte : épargne restituable aux membres.', 3050: 'Part des excédents mise en réserve (statuts art. 29.1).', 3090: 'Produits − charges de l’exercice (calculé).',
+  4010: 'Frais d’inscription des nouveaux membres.', 4020: 'Cotisations Caisse Rouge, non remboursables.', 4030: 'Amendes d’absence, de retard et de cotisation.',
+  4040: 'Intérêts des prêts (1,5 % dégressif).', 4050: 'Pénalités de retard sur prêts.', 4060: 'Dons et subventions reçus par la mutuelle.', 4090: 'Autres recettes.',
+  5010: 'Fournitures, carnets, frais de bureau.', 5020: 'Aides aux membres : maladie, mariage, urgence.', 5030: 'Frais prélevés par CAP-AIDER.',
+  5040: 'Collation, location de salle.', 5050: 'Dons et subventions faits par la mutuelle.', 5090: 'Autres dépenses.',
 };
 const DEP_CATS = [
   { label: 'Frais administratifs', acc: 5010 },
@@ -274,7 +288,7 @@ function accClass(acc) { return +String(acc)[0]; }
 
 function buildJournal() {
   const E = [];
-  const add = (date, piece, lib, lines, src) => E.push({ date: parseD(date), piece, lib, lines: lines.filter((l) => num(l.d) || num(l.c)), src });
+  const add = (date, piece, lib, lines, src) => E.push({ seq: E.length, date: parseD(date), piece, lib, lines: lines.filter((l) => num(l.d) || num(l.c)), src });
   DB.cotisations.forEach((c, i) => {
     const v = num(c.verte), r = num(c.rouge);
     add(c.date, 'COT-' + (i + 1), 'Cotisation ' + c.code + ' — ' + nameOf(c.code), [
@@ -282,22 +296,30 @@ function buildJournal() {
   });
   DB.amendes_paid.forEach((a, i) => add(a.date, 'AM-' + (i + 1), 'Amende ' + a.code + ' — ' + nameOf(a.code),
     [{ acc: cashAcc(a.mode || BANK), d: a.montant }, { acc: 4030, c: a.montant }], 'am'));
-  DB.depenses.forEach((d, i) => add(d.date, d.piece || 'DEP-' + (i + 1), 'Dépense — ' + (d.beneficiaire || d.categorie),
-    [{ acc: depAccount(d.categorie), d: d.montant }, { acc: cashAcc(d.mode || BANK), c: d.montant }], 'dep'));
+  DB.depenses.forEach((d, i) => {
+    // Dépense payée en caisse après un retrait à CAP-AIDER : le retrait est passé en écriture le même jour
+    if (d.retrait) add(d.date, 'RET-' + (d.piece || i + 1), 'Retrait CAP-AIDER pour la dépense ' + (d.piece || ''), [{ acc: 1010, d: d.montant }, { acc: 1020, c: d.montant }], 'trf');
+    add(d.date, d.piece || 'DEP-' + (i + 1), 'Dépense — ' + (d.beneficiaire || d.categorie),
+      [{ acc: depAccount(d.categorie), d: d.montant }, { acc: d.retrait ? 1010 : cashAcc(d.mode || BANK), c: d.montant }], 'dep');
+  });
   DB.prets.forEach((p) => {
     add(p.date, 'PRET-' + p.id, 'Décaissement prêt ' + p.code_membre + ' — ' + nameOf(p.code_membre),
       [{ acc: 1210, d: p.capital }, { acc: cashAcc(p.mode || BANK), c: p.capital }], 'pret');
     (p.payments || []).forEach((x) => add(x.date, 'RMB-' + p.id + '-' + x.n, 'Remboursement prêt #' + p.id + ' éch. ' + x.n + ' — ' + p.code_membre, [
       { acc: cashAcc(x.mode), d: x.montant }, { acc: 1210, c: x.cap }, { acc: 4040, c: x.int }, { acc: 4050, c: x.pen }], 'rmb'));
   });
-  (DB.dons || []).forEach((d, i) => add(d.date, 'DON-' + (i + 1), 'Caisse Bleue — ' + (d.nature || 'Don') + ' de ' + (d.donateur || ''),
-    [{ acc: cashAcc(d.mode || BANK), d: d.montant }, { acc: 3020, c: d.montant }], 'don'));
+  (DB.dons || []).forEach((d, i) => {
+    const recu = d.sens !== 'accorde';
+    add(d.date, 'DON-' + (i + 1), (d.nature || 'Don') + (recu ? ' reçu de ' : ' accordé à ') + (d.tiers || d.donateur || ''),
+      recu ? [{ acc: cashAcc(d.mode || BANK), d: d.montant }, { acc: 4060, c: d.montant }] : [{ acc: 5050, d: d.montant }, { acc: cashAcc(d.mode || BANK), c: d.montant }], 'don');
+  });
   DB.transferts.forEach((t, i) => {
     const toBank = t.sens !== 'retrait';
     add(t.date, 'TRF-' + (i + 1), toBank ? 'Dépôt de la caisse à la banque' : 'Retrait de la banque vers la caisse',
       toBank ? [{ acc: 1020, d: t.montant }, { acc: 1010, c: t.montant }] : [{ acc: 1010, d: t.montant }, { acc: 1020, c: t.montant }], 'trf');
   });
-  E.sort((a, b) => (a.date - b.date) || a.piece.localeCompare(b.piece));
+  // Même jour : ordre de saisie (ex. le retrait CAP-AIDER avant la dépense qu'il finance)
+  E.sort((a, b) => (a.date - b.date) || (a.seq - b.seq));
   return E;
 }
 /* Soldes par compte jusqu'à une date (incluse), mouvements sur une période */
@@ -325,7 +347,8 @@ function financials(from, to) {
   const totPcum = sum(produits, (x) => x.cum), totCcum = sum(charges, (x) => x.cum);
   const actif = [1010, 1020, 1210].map((a) => ({ acc: a, v: solde(B, a) }));
   const passif = accs.filter((a) => accClass(a) === 2).map((a) => ({ acc: a, v: -solde(B, a) }));
-  const capitaux = [{ acc: 3010, v: -solde(B, 3010) }].concat(B[3020] ? [{ acc: 3020, v: -solde(B, 3020) }] : []).concat([{ acc: 3090, v: totPcum - totCcum }]);
+  const capitaux = [{ acc: 3010, v: -solde(B, 3010) }].concat(B[3050] ? [{ acc: 3050, v: -solde(B, 3050) }] : []).concat([{ acc: 3090, v: totPcum - totCcum }]);
+  produits.sort((a, b) => a.acc - b.acc); charges.sort((a, b) => a.acc - b.acc); passif.sort((a, b) => a.acc - b.acc);
   return { J, B, produits, charges, totP, totC, resultat: totP - totC, resultatCum: totPcum - totCcum, actif, passif, capitaux,
     totActif: sum(actif, (x) => x.v), totPassif: sum(passif, (x) => x.v) + sum(capitaux, (x) => x.v) };
 }
@@ -340,12 +363,12 @@ function treasury(asOf) {
   const deps = DB.depenses.filter(ok);
   const depRouge = sum(deps.filter((d) => (d.caisse || (depAccount(d.categorie) === 5020 ? 'Caisse Rouge' : 'Caisse Verte')) === 'Caisse Rouge'), (d) => d.montant);
   const depVerte = sum(deps, (d) => d.montant) - depRouge;
-  const produitsVerte = solde(B, 4030) * -1 + solde(B, 4040) * -1 + solde(B, 4050) * -1 + solde(B, 4010) * -1;
+  // Produits de la mutuelle (statuts art. 25.1 : vont en Caisse Verte), moins les dons accordés
+  const produitsVerte = -(solde(B, 4010) + solde(B, 4030) + solde(B, 4040) + solde(B, 4050) + solde(B, 4060) + solde(B, 4090)) - solde(B, 5050);
   // Caisse Verte (statuts art. 25.1) : cotisations vertes + amendes, intérêts, pénalités, frais d'inscription
   const verteFonds = verteCot + produitsVerte - depVerte;
   const rougeFonds = rougeCot - depRouge;
-  const bleueFonds = -solde(B, 3020);
-  return { caisse, banque, prets, actif: caisse + banque + prets, verteFonds, verteDispo: verteFonds - prets, rougeFonds, bleueFonds, verteCot, rougeCot, depRouge, depVerte };
+  return { caisse, banque, prets, actif: caisse + banque + prets, verteFonds, verteDispo: verteFonds - prets, rougeFonds, verteCot, rougeCot, depRouge, depVerte };
 }
 function monthsRange(fromKey, toKey) {
   const out = []; let [y, m] = fromKey.split('-').map(Number); const [ty, tm] = toKey.split('-').map(Number);
