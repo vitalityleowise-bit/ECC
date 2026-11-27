@@ -1,0 +1,30 @@
+# Secrets - NEVER commit these
+.env
+.env.*
+*.key
+*.pem
+secrets/
+app/android/key.properties
+app/**/google-services.json
+app/**/*.keystore
+app/**/*.jks
+
+# Learner recordings / personal audio
+recordings/
+**/user_audio/
+
+# Flutter / Dart build output
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/build/
+app/.pub-cache/
+app/pubspec.lock
+
+# Node backend
+backend/node_modules/
+backend/dist/
+
+# OS / editor
+.DS_Store
+*.log
