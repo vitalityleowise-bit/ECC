@@ -109,9 +109,7 @@ I. DEMANDES DU 27/11/2026
      ordre des comptes dans tous les états financiers, compte de la Caisse Bleue.
 
 J. DEMANDES DU 27/11/2026 (2e partie) — FAIT en version 3.4 (HTML à tester)
-   - Données reprises de la sauvegarde du trésorier (26/11) : comité M001 Secrétaire,
-     M003 Contrôleur, M006 Resp. cotisation, M008 Resp. crédit ; M016 ANTONY ; feuille du
-     26/11 ; demande M001 rejetée ; pénalité prêt 3 % ; alarme 7h40. Exercice gardé au 1er avril.
+   - Données reprises de la dernière sauvegarde du trésorier (fichier privé, hors Git).
    - Réunion programmée : fichier d'ordre du jour (photo ou PDF), visible des membres
      dans « Mon compte » (réunions du comité visibles seulement du comité).
    - Dépense : l'argent sort de la caisse après un retrait à CAP-AIDER (écriture de retrait
