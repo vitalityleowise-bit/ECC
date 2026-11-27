@@ -134,3 +134,11 @@ K. CLASSEUR EXCEL DU TRÉSORIER (UNIE_MUSO_SEPTEMBRE.xlsx) — FAIT
      (2 831 − 3 500 = −669).
    - À faire par le trésorier : préciser le motif des anciennes amendes (cotisation ou
      retard/absence) et le détail des dépenses reprises du classeur.
+
+L. NOTIFICATIONS (27/11/2026) — FAIT en version 3.6.3
+   - Notification sur le téléphone et le PC dès qu'arrive : une annonce (tous les membres),
+     un message / une suggestion / une demande de prêt (comité), une réponse du comité ou
+     la décision sur une demande de prêt (le membre concerné).
+   - Fonctionne quand l'application est ouverte ou en arrière-plan. Sur PC, UNIE-MUSO reste
+     actif près de l'horloge. Application complètement fermée sur le téléphone : pas de
+     notification (demanderait Firebase Cloud Messaging + Cloud Functions, formule Blaze).

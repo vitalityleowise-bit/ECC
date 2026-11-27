@@ -224,6 +224,7 @@ function onRemoteDb(snap) {
 }
 function onRemoteCollab(arr, snap, scoped) {
   const conf = COLLAB[arr]; const st = syncState(); const rec = st.recs[conf.col] = st.recs[conf.col] || {};
+  st.got = st.got || {}; const firstSeen = !!st.got[conf.col]; st.got[conf.col] = true; // liste déjà reçue au moins une fois sur cet appareil
   const remote = {}; snap.forEach((d) => { remote[d.id] = d.data(); });
   const local = DB[arr] || [];
   const out = []; const seen = new Set();
@@ -237,7 +238,42 @@ function onRemoteCollab(arr, snap, scoped) {
   if (arr === 'demandes_pret') fixDemandeIds(out);
   const changed = JSON.stringify(out) !== JSON.stringify(local);
   saveSyncState();
-  if (changed) { DB[arr] = out; store.set(KEYS.db, DB); afterRemoteChange(); }
+  if (changed) {
+    // Premier chargement sur un appareil neuf : pas de notification pour tout l'historique
+    if (firstSeen) notifyRemoteChanges(arr, local, out);
+    DB[arr] = out; store.set(KEYS.db, DB); afterRemoteChange();
+  }
+}
+/* ---------- Notifications système (téléphone, PC) pour ce qui arrive du serveur ---------- */
+function shortTxt(x, n) { x = String(x || '').replace(/\s+/g, ' ').trim(); return x.length > (n || 90) ? x.slice(0, (n || 90) - 1) + '…' : x; }
+function notifyRemoteChanges(arr, before, after) {
+  if (!SESSION || SETTINGS.notif_online === false) return;
+  const me = mySelfCode(); const comite = isOnlineComite();
+  const idOf = (it) => String(recKey(arr, it));
+  const old = {}; before.forEach((it) => { old[idOf(it)] = it; });
+  const list = [];
+  after.forEach((it) => {
+    const prev = old[idOf(it)];
+    if (arr === 'annonces' && !prev && it.by_code !== me) list.push(['UNIE-MUSO — Annonce du comité', (it.titre ? it.titre + ' : ' : '') + shortTxt(it.texte)]);
+    if (arr === 'messages') {
+      if (!prev && comite && it.from_code !== me) list.push(['UNIE-MUSO — Message de ' + (it.from_name || it.from_code), (it.sujet ? it.sujet + ' : ' : '') + shortTxt(it.texte)]);
+      const r0 = prev ? (prev.replies || []).length : 0; const r = it.replies || [];
+      if (prev && r.length > r0) {
+        const last = r[r.length - 1];
+        if (last && last.by_code !== me && (it.from_code === me || comite)) list.push(['UNIE-MUSO — Réponse de ' + (last.by_name || 'du comité'), (it.sujet ? it.sujet + ' : ' : '') + shortTxt(last.texte)]);
+      }
+    }
+    if (arr === 'suggestions') {
+      if (!prev && comite && it.from_code !== me) list.push(['UNIE-MUSO — Nouvelle suggestion', shortTxt(it.texte)]);
+      if (prev && !prev.reponse && it.reponse && it.from_code === me) list.push(['UNIE-MUSO — Réponse à votre suggestion', shortTxt(it.reponse)]);
+    }
+    if (arr === 'demandes_pret') {
+      if (!prev && comite && it.code_membre !== me) list.push(['UNIE-MUSO — Nouvelle demande de prêt', (it.nom_membre || nameOf(it.code_membre)) + (it.montant_demande ? ' : ' + money(it.montant_demande) : '')]);
+      if (prev && prev.statut !== it.statut && it.code_membre === me && it.statut !== 'En attente') list.push(['UNIE-MUSO — Votre demande de prêt', it.statut + (it.statut === 'Approuvée' && it.montant_approuve ? ' : ' + money(it.montant_approuve) : '')]);
+    }
+  });
+  if (list.length > 3) notify('UNIE-MUSO', list.length + ' nouveautés : ' + list.slice(0, 3).map((x) => x[0].replace('UNIE-MUSO — ', '')).join(', ') + '…');
+  else list.forEach((x) => notify(x[0], x[1]));
 }
 /* Deux demandes créées hors ligne peuvent avoir le même numéro : la plus récente est renumérotée */
 function fixDemandeIds(list) {
