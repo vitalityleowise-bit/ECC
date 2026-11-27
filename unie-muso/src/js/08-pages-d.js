@@ -4,6 +4,11 @@
    ========================================================================= */
 
 /* ---------- Réunions et quorum ---------- */
+/* Planifier les réunions et l'ordre du jour : réservé à la présidente et au (à la) secrétaire du comité */
+function planPoste(m) { return m && m.is_comite && /^(pr[ée]sident|secr[ée]taire$)/i.test(String(m.comite_poste || '').trim()); }
+function canPlanMeetings() { return !!planPoste(currentMember()); }
+function planners() { return DB.members.filter(planPoste).map((m) => memberName(m) + ' (' + m.comite_poste + ')').join(' et ') || 'la présidente et le secrétaire (à désigner dans Paramètres)'; }
+function planBlock() { if (canPlanMeetings()) return false; toast('Seuls ' + planners() + ' peuvent planifier les réunions.', 'err'); return true; }
 const REUNION_TYPES = [
   { v: 'ordinaire', l: 'Assemblée ordinaire' }, { v: 'extraordinaire', l: 'Assemblée extraordinaire' }, { v: 'comite', l: 'Réunion du comité' },
 ];
@@ -45,15 +50,16 @@ PAGES.reunions = function () {
     }
     const ex = (DB.reunions || []).find((x) => fmtD(x.date) === fmtD(r.date) && (x.type || 'ordinaire') === (r.type || 'ordinaire'));
     act += odjButton(ex);
-    if (canEdit()) act += '<button class="btn btn-sm" data-act="reunionEdit" data-id="' + toISO(r.date) + '|' + esc(r.type || 'ordinaire') + '">' + (ex && ex.odj ? t('edit') : 'Ordre du jour / ' + t('edit').toLowerCase()) + '</button>';
-    if (!r.auto && canEdit()) act += '<button class="btn btn-sm btn-danger" data-act="reunionDel" data-id="' + esc(k + '|' + (r.type || '')) + '">' + t('del') + '</button>';
+    if (canPlanMeetings()) act += '<button class="btn btn-sm" data-act="reunionEdit" data-id="' + toISO(r.date) + '|' + esc(r.type || 'ordinaire') + '">' + (ex && ex.odj ? t('edit') : 'Ordre du jour / ' + t('edit').toLowerCase()) + '</button>';
+    if (!r.auto && canPlanMeetings()) act += '<button class="btn btn-sm btn-danger" data-act="reunionDel" data-id="' + esc(k + '|' + (r.type || '')) + '">' + t('del') + '</button>';
     const type = (REUNION_TYPES.find((x) => x.v === (r.type || 'ordinaire')) || REUNION_TYPES[0]).l;
     return '<tr><td class="num">' + esc(longDate(r.date)) + '<div class="muted" style="font-size:11px">' + esc((r.heure || SETTINGS.meeting_hour) + (r.lieu ? ' · ' + r.lieu : '')) + '</div></td>' +
       '<td>' + esc(type) + (r.objet ? '<div class="muted" style="font-size:11px">' + esc(r.objet) + '</div>' : '') + '</td>' +
       '<td class="c num">' + pres + '</td><td class="c num">' + qreq + '</td><td>' + st + '</td><td class="act">' + act + '</td></tr>';
   });
   return pageHead('Gestion', t('reunions'), 'Quorum : 50 % + 1 des membres actifs (présents, en retard et représentés comptent). Sans quorum, la réunion ne compte pas : pas d’amende de retard ni d’absence, et ses opérations passent au rapport du mois suivant.',
-    (canEdit() ? '<button class="btn" data-go="membres">Registre des présences</button><button class="btn btn-primary" data-act="reunionNew">Programmer une réunion</button>' : '')) +
+    (canEdit() ? '<button class="btn" data-go="membres">Registre des présences</button>' : '') + (canPlanMeetings() ? '<button class="btn btn-primary" data-act="reunionNew">Programmer une réunion</button>' : '')) +
+    '<div class="muted" style="margin:-8px 0 12px;font-size:12px">Planification des réunions et ordre du jour : ' + esc(planners()) + '.</div>' +
     '<div class="kpis">' + kpi('Membres actifs', N, '', 'navy') + kpi('Quorum requis', req, Math.floor(N / 2) + ' + 1', 'orange') +
       kpi('Réunions valides', valid, 'avec quorum', 'green') + kpi('Sans quorum', noQ, 'non comptées', noQ ? 'red' : '') + '</div>' +
     '<section class="panel">' + table(['Date', 'Type', ['Présents', 'c'], ['Requis', 'c'], 'Statut', ''], tr) + '</section>';
@@ -73,9 +79,10 @@ function reunionForm(r) {
     '<div class="full" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn btn-sm" data-act="odjPick">Joindre le fichier de l’ordre du jour</button>' +
       '<span id="odj-state" class="muted">' + (r.odj ? esc(r.odj.name) + ' (' + Math.round(r.odj.data.length * 0.75 / 1024) + ' Ko)' : 'Aucun fichier — photo ou PDF') + '</span>' +
       '<input type="hidden" name="odj" value="' + esc(r.odj ? JSON.stringify(r.odj) : '') + '"></div></div>' +
-    '<div class="muted" style="margin-top:8px">Les réunions du comité sont programmées par la présidente. Les convocations par notification, avec confirmation de présence et relances, arriveront avec la version en ligne.</div>';
+    '<div class="muted" style="margin-top:8px">Les réunions sont planifiées par la présidente et le secrétaire. Les convocations par notification, avec confirmation de présence et relances, arriveront avec la version en ligne.</div>';
 }
 function saveReunion(v, existing) {
+  if (planBlock()) return false;
   if (!parseD(v.date)) { toast('Date invalide.', 'err'); return false; }
   DB.reunions = DB.reunions || [];
   const rec = Object.assign(existing || { quorum: 'auto', par: mySelfCode() || SESSION.id }, {
@@ -85,9 +92,10 @@ function saveReunion(v, existing) {
   if (!saveDB()) return false;
   toast('Réunion du ' + rec.date + ' enregistrée' + (rec.odj ? ' avec son ordre du jour.' : '.'), 'ok'); render();
 }
-ACTIONS.reunionNew = () => openModal({ title: 'Programmer une réunion', submit: t('save'), body: reunionForm(), onSubmit: (v) => saveReunion(v) });
+ACTIONS.reunionNew = () => planBlock() || openModal({ title: 'Programmer une réunion', submit: t('save'), body: reunionForm(), onSubmit: (v) => saveReunion(v) });
 /* Modifier une réunion (ou ajouter l'ordre du jour d'une réunion mensuelle) : clé « date ISO|type » */
 ACTIONS.reunionEdit = (key) => {
+  if (planBlock()) return;
   const [iso, type] = key.split('|'); const k = fmtD(iso);
   const ex = (DB.reunions || []).find((r) => fmtD(r.date) === k && (r.type || 'ordinaire') === (type || 'ordinaire'));
   openModal({ title: 'Réunion du ' + k, submit: t('save'), body: reunionForm(ex || { type: type || 'ordinaire', date: k, heure: SETTINGS.meeting_hour }), onSubmit: (v) => saveReunion(v, ex) });
@@ -119,11 +127,14 @@ function odjButton(r) { const i = (DB.reunions || []).indexOf(r); return r && r.
 /* « Mon compte » : prochaines réunions (et celles du comité pour ses membres) */
 function memberMeetingsPanel(m) {
   const up = (DB.reunions || []).filter((r) => parseD(r.date) >= today() && (r.type !== 'comite' || m.is_comite)).sort((a, b) => parseD(a.date) - parseD(b.date));
-  if (!up.length) return '';
+  const btn = canPlanMeetings() ? '<button class="btn btn-sm btn-primary" data-act="reunionNew">Programmer une réunion</button><button class="btn btn-sm" data-go="reunions">Toutes les réunions</button>' : '';
+  if (!up.length) return btn ? panel('Réunions programmées', '<span class="muted">Aucune réunion programmée.</span>', { right: btn }) : '';
   return panel('Réunions programmées', table(['Date', 'Type', 'Lieu', ''], up.map((r) => '<tr><td class="num">' + esc(longDate(r.date)) + ' · ' + esc(r.heure || '') + '</td><td>' + esc((REUNION_TYPES.find((x) => x.v === r.type) || REUNION_TYPES[0]).l) +
-    (r.objet ? '<div class="muted" style="font-size:11px;white-space:pre-wrap">' + esc(r.objet) + '</div>' : '') + '</td><td>' + esc(r.lieu || '') + '</td><td class="act">' + odjButton(r) + '</td></tr>')), { flush: true });
+    (r.objet ? '<div class="muted" style="font-size:11px;white-space:pre-wrap">' + esc(r.objet) + '</div>' : '') + '</td><td>' + esc(r.lieu || '') + '</td><td class="act">' + odjButton(r) +
+    (canPlanMeetings() ? '<button class="btn btn-sm" data-act="reunionEdit" data-id="' + toISO(r.date) + '|' + esc(r.type || 'ordinaire') + '">' + t('edit') + '</button>' : '') + '</td></tr>')), { flush: true, right: btn });
 }
 ACTIONS.reunionDel = (key) => {
+  if (planBlock()) return;
   const [k, type] = key.split('|');
   confirmBox('Supprimer la réunion', 'Supprimer la réunion programmée du ' + esc(k.replace('-c', '')) + ' ?', () => {
     DB.reunions = DB.reunions.filter((r) => !(fmtD(r.date) === k.replace('-c', '') && (r.type || '') === type)); saveDB(); render();
