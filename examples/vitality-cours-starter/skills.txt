@@ -1,0 +1,41 @@
+# VITALITY COURS - AI language tutor (voice, correction, pronunciation, many styles).
+# One skill folder name per line. Lines starting with # are ignored.
+
+# Planning
+blueprint
+product-capability
+search-first
+
+# Flutter mobile app
+dart-flutter-patterns
+flutter-dart-code-review
+design-system
+accessibility
+i18n-sync
+
+# AI tutor brain (routing several models, cost, prompt quality, evals)
+cost-aware-llm-pipeline
+prompt-optimizer
+prompt-caching-strategy
+eval-harness
+
+# Real-time voice (low latency streaming)
+latency-critical-systems
+
+# Backend and services
+backend-patterns
+api-design
+mcp-server-patterns
+error-handling
+
+# Quality and safety (always on)
+tdd-workflow
+verification-loop
+coding-standards
+security-review
+production-audit
+
+# Shipping and long sessions
+deployment-patterns
+git-workflow
+strategic-compact
