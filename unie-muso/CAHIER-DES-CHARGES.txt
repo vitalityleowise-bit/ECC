@@ -121,3 +121,16 @@ J. DEMANDES DU 27/11/2026 (2e partie) — FAIT en version 3.4 (HTML à tester)
      balance et bilan classés par classe avec sous-totaux.
    - Caisse Bleue retirée : « Dons et subventions », reçus (4060) ou accordés (5050).
    NOTE : traduction KR limitée aux menus et éléments principaux ; le reste reste en français.
+
+K. CLASSEUR EXCEL DU TRÉSORIER (UNIE_MUSO_SEPTEMBRE.xlsx) — FAIT
+   - Plan comptable du trésorier repris tel quel : 1 Trésorerie, 2 Créances, 3 Passif
+     (3010 Caisse Verte), 4 Liaison, 5 Capitaux propres (5020 Caisse Rouge, 5040 Surplus),
+     7 Produits, 6 Charges (+ 6050 Réunion du comité ; ajout 6060 Dons accordés).
+   - Balance, Bilan et État des résultats au format des feuilles du classeur.
+   - Données manquantes ajoutées (fichier privé) : frais d'inscription, dépenses
+     d'avril, mai, septembre et octobre, capital social CAP-AIDER, vente de livret.
+   - Contrôle au 29/10/2026 : chaque compte identique à la feuille BALANCE_VERIFICATION
+     (totaux 265 450 / 265 450) ; bilan 241 900 ; état des résultats d'octobre identique
+     (2 831 − 3 500 = −669).
+   - À faire par le trésorier : préciser le motif des anciennes amendes (cotisation ou
+     retard/absence) et le détail des dépenses reprises du classeur.

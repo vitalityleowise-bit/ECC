@@ -250,7 +250,7 @@ PAGES.cotisations = function () {
       modeSummary(list) + '</div>' + (canEdit() ? bulkBar('cot', list.map((c) => c.i)) : '') +
       table((canEdit() ? [['', 'c']] : []).concat(['Date', 'Membre', ['Verte', 'n'], ['Rouge', 'n'], ['Total', 'n'], 'Mode', '']), rows,
       '<tr>' + (canEdit() ? '<td></td>' : '') + '<td colspan="2">Total</td><td class="n">' + fmt(sum(list, (c) => c.verte)) + '</td><td class="n">' + fmt(sum(list, (c) => c.rouge)) + '</td><td class="n">' + fmt(sum(list, (c) => num(c.verte) + num(c.rouge))) + '</td><td colspan="2"></td></tr>') + '</section>' +
-    amendesPanel();
+    amendesPanel() + inscriptionsPanel();
 };
 ACTIONS.cotFilterCode = (_i, el) => { STATE.filt = Object.assign({}, STATE.filt, { code: el.value }); render(); };
 ACTIONS.cotFilterMonth = (_i, el) => { STATE.filt = Object.assign({}, STATE.filt, { month: el.value }); render(); };
@@ -474,3 +474,25 @@ function attendanceRegister() {
     (meets.length ? '<div class="tbl-wrap"><table class="tbl"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' : '<div class="empty">Aucune réunion enregistrée.</div>') +
     '<div class="section-note">Cliquez sur une date pour faire ou corriger la feuille de présence. Le pointage fait foi ; pour les anciennes réunions sans feuille, la présence est estimée d’après les cotisations du jour. Ligne Quorum : présents / requis. Voir aussi l’onglet <button class="btn-link" data-go="reunions">Réunions et quorum</button>.</div></section>';
 }
+
+/* ---------- Frais d'inscription (compte 7010, non remboursables) ---------- */
+function inscriptionsPanel() {
+  const list = (DB.inscriptions || []).map((x, i) => Object.assign({ i }, x)).sort((x, y) => parseD(y.date) - parseD(x.date));
+  const sans = DB.members.filter((m) => !(DB.inscriptions || []).some((x) => x.code === m.code));
+  return '<section class="panel"><div class="panel-head"><h2>Frais d’inscription</h2><span class="meta">' + list.length + ' · ' + money(sum(list, (x) => x.montant)) + (sans.length ? ' · non payés : ' + esc(sans.map((m) => m.code).join(', ')) : '') + '</span>' +
+    (canEdit() ? '<div class="right"><button class="btn btn-sm btn-primary" data-act="insNew">Encaisser des frais d’inscription</button></div>' : '') + '</div>' +
+    table(['Date', 'Membre', ['Montant', 'n'], 'Mode', ''], list.map((x) => '<tr><td class="num">' + esc(x.date) + '</td><td><span class="code">' + x.code + '</span> ' + esc(nameOf(x.code)) + '</td><td class="n">' + fmt(x.montant) + '</td><td>' + esc(x.mode || BANK) + '</td>' +
+      '<td class="act">' + (canEdit() ? '<button class="btn btn-sm btn-danger" data-act="insDel" data-id="' + x.i + '">' + t('del') + '</button>' : '') + '</td></tr>'),
+      '<tr><td colspan="2">Total</td><td class="n">' + fmt(sum(list, (x) => x.montant)) + '</td><td colspan="2"></td></tr>') + '</section>';
+}
+ACTIONS.insNew = (code) => openModal({
+  title: 'Frais d’inscription', submit: t('save'),
+  body: '<div class="form-grid">' + field(t('member'), select('code', memberOptions(), code || ''), 'full') + field(t('date'), input('date', toISO(today()), 'type="date"')) +
+    field(t('amount') + ' (HTG)', input('montant', RULES.frais_inscription, 'type="number" min="0" step="any"')) + field('Mode', select('mode', [BANK, CASH], BANK)) + '</div>',
+  onSubmit: (v) => {
+    if (num(v.montant) <= 0) { toast('Montant invalide.', 'err'); return false; }
+    DB.inscriptions = DB.inscriptions || []; DB.inscriptions.push({ date: fmtD(v.date), code: v.code, montant: num(v.montant), mode: v.mode });
+    saveDB(); toast('Frais d’inscription enregistrés (compte 7010).', 'ok'); render();
+  },
+});
+ACTIONS.insDel = (i) => confirmBox('Supprimer', 'Supprimer ces frais d’inscription de ' + money(DB.inscriptions[+i].montant) + ' ?', () => { DB.inscriptions.splice(+i, 1); saveDB(); render(); }, t('del'));

@@ -155,12 +155,12 @@ function reportRange(key) {
 }
 
 /* ---------- Dons et subventions ----------
-   Reçus par la mutuelle (produit 4060) ou accordés par la mutuelle (charge 5050). */
+   Reçus par la mutuelle (produit 7050) ou accordés par la mutuelle (charge 6060). */
 const DON_SENS = [{ v: 'recu', l: 'Reçu par la mutuelle' }, { v: 'accorde', l: 'Accordé par la mutuelle' }];
 PAGES.dons = function () {
   const list = (DB.dons || []).map((d, i) => Object.assign({ i }, d)).sort((a, b) => parseD(b.date) - parseD(a.date));
   const recus = list.filter((d) => d.sens !== 'accorde'); const acc = list.filter((d) => d.sens === 'accorde');
-  return pageHead('Gestion', t('dons'), 'Un don ou une subvention reçu par la mutuelle (compte 4060), ou accordé par la mutuelle (compte 5050)',
+  return pageHead('Gestion', t('dons'), 'Un don ou une subvention reçu par la mutuelle (compte 7050), ou accordé par la mutuelle (compte 6060)',
     canEdit() ? '<button class="btn" data-act="donNew" data-id="accorde">Don accordé par la mutuelle</button><button class="btn btn-primary" data-act="donNew" data-id="recu">Don reçu par la mutuelle</button>' : '') +
     '<div class="kpis">' + kpi('Reçus', fmt(sum(recus, (d) => d.montant)) + ' <small>HTG</small>', recus.length + ' don(s) / subvention(s)', 'green') +
       kpi('Accordés', fmt(sum(acc, (d) => d.montant)) + ' <small>HTG</small>', acc.length + ' don(s)', 'orange') + '</div>' +
@@ -191,18 +191,18 @@ ACTIONS.donDel = (i) => confirmBox('Supprimer', 'Supprimer ce don de ' + money(D
 PAGES.plancomptable = function () {
   const B = balances(buildJournal(), null, null); const F = financials();
   const rows = [];
-  [1, 2, 3, 4, 5].forEach((cl) => {
+  CLASS_ORDER.forEach((cl) => {
     rows.push('<tr><td colspan="4" style="background:var(--navy);color:#fff;font-weight:700">' + esc(ACCOUNT_CLASSES[cl]) + '</td></tr>');
     Object.keys(ACCOUNTS).map(Number).filter((a) => accClass(a) === cl).sort((a, b) => a - b).forEach((a) => {
       let v = B[a] ? B[a].d - B[a].c : 0;
-      if (a === 3090) v = -F.resultatCum;
-      const shown = cl === 1 || cl === 5 ? v : -v;
+      if (a === 5040) v = -F.resultatCum;
+      const shown = isActifClass(cl) || cl === 6 ? v : -v;
       rows.push('<tr><td class="code">' + a + '</td><td>' + esc(ACCOUNTS[a]) + '</td><td class="muted">' + esc(ACCOUNT_USAGE[a] || '') + '</td><td class="n">' + (shown ? fmt(shown) : '—') + '</td></tr>');
     });
   });
-  return pageHead('Comptabilité', t('plancomptable'), 'Classes du plan comptable haïtien · soldes cumulés au ' + fmtD(today()), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
+  return pageHead('Comptabilité', t('plancomptable'), 'Plan comptable du trésorier · soldes cumulés au ' + fmtD(today()), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
     '<section class="panel">' + table(['Compte', 'Intitulé', 'Utilisation', ['Solde', 'n']], rows) +
-    '<div class="section-note">Les produits (classe 4) et les charges (classe 5) ne sont jamais portés en capital : seul le résultat de l’exercice (3090 = produits − charges) apparaît dans les capitaux propres du bilan.</div></section>';
+    '<div class="section-note">Plan comptable du trésorier (classeur UNIE-MUSO). Caisse Verte au passif (épargne due aux membres), Caisse Rouge en capitaux propres ; les produits (classe 7) et les charges (classe 6) ne sont jamais portés en capital : seul le surplus de l’exercice (5040 = produits − charges) apparaît au bilan. Ajout : 6060 Dons accordés.</div></section>';
 };
 
 /* ---------- Messages et suggestions ----------

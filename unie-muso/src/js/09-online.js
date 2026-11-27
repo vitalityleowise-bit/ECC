@@ -9,7 +9,7 @@
 const FB_CONF = typeof PRIVATE_FIREBASE !== 'undefined' && PRIVATE_FIREBASE ? PRIVATE_FIREBASE : null;
 const ONLINE = { app: null, auth: null, fs: null, status: 'off', detail: '', unsub: [], lastSync: null, pushing: false, retry: null, who: '' };
 const SYNC_KEY = 'uniemuso-sync-v1';
-const SHARED_ARRAYS = ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'transferts', 'reunions', 'dons'];
+const SHARED_ARRAYS = ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'transferts', 'reunions', 'dons', 'inscriptions'];
 const SHARED_CFG = ['cfg_rules', 'cfg_grille', 'cfg_settings', 'cfg_docs'];
 const COLLAB = {
   messages: { col: 'messages', own: 'from_code' },

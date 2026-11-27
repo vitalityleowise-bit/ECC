@@ -253,38 +253,56 @@ function evaluateDemande(d) {
 }
 
 /* ---------- Comptabilité : plan comptable et journal ---------- */
-/* Plan comptable UNIE-MUSO (classes du plan comptable haïtien).
-   Les produits (classe 4) et les charges (classe 5) ne vont jamais en capital : seul leur solde net
-   (le résultat de l'exercice, compte 3090) apparaît dans les capitaux propres du bilan. */
-const ACCOUNT_CLASSES = { 1: 'Classe 1 — Actif', 2: 'Classe 2 — Passif', 3: 'Classe 3 — Capitaux propres', 4: 'Classe 4 — Produits', 5: 'Classe 5 — Charges' };
+/* Plan comptable UNIE-MUSO — repris du classeur du trésorier (feuille PLAN_COMPTABLE).
+   Caisse Verte = passif (épargne due aux membres) ; Caisse Rouge = capital de solidarité ;
+   produits en classe 7, charges en classe 6 ; le surplus de l'exercice (5040) = produits − charges. */
+const ACCOUNT_CLASSES = {
+  1: 'Classe 1 — Trésorerie (actif)', 2: 'Classe 2 — Créances (actif)', 3: 'Classe 3 — Passif', 4: 'Classe 4 — Liaison',
+  5: 'Classe 5 — Capitaux propres', 7: 'Classe 7 — Produits', 6: 'Classe 6 — Charges',
+};
+const CLASS_ORDER = [1, 2, 3, 4, 5, 7, 6];
 const ACCOUNTS = {
-  1010: 'Encaisse (caisse)', 1020: 'Banque CAP-AIDER', 1210: 'Prêts aux membres',
-  2010: 'Dettes envers des tiers',
-  3010: 'Caisse Verte — épargne des membres', 3050: 'Fonds de réserve', 3090: 'Résultat de l’exercice',
-  4010: 'Frais d’inscription', 4020: 'Cotisations Caisse Rouge (solidarité)', 4030: 'Amendes',
-  4040: 'Intérêts sur prêts', 4050: 'Pénalités sur prêts', 4060: 'Dons et subventions reçus', 4090: 'Autres produits',
-  5010: 'Frais administratifs', 5020: 'Secours de solidarité (Caisse Rouge)', 5030: 'Frais bancaires CAP-AIDER',
-  5040: 'Frais de réunion', 5050: 'Dons et subventions accordés', 5090: 'Autres charges',
+  1010: 'Encaisse', 1020: 'Banque — CAP-AIDER', 1030: 'Capital social — CAP-AIDER',
+  2010: 'Prêts aux membres', 2020: 'Intérêts à recevoir', 2030: 'Pénalités à recevoir',
+  3010: 'CAISSE VERTE', 3020: 'Fonds extérieurs reçus',
+  4010: 'Membres — comptes courants', 4020: 'Fournisseurs',
+  5010: 'Capital social UNIE-MUSO', 5020: 'CAISSE ROUGE (capital solidarité)', 5030: 'Réserves accumulées', 5040: 'Surplus de l’exercice',
+  7010: 'Frais d’inscription', 7020: 'Intérêts sur prêts accordés', 7030: 'Intérêts CAP-AIDER', 7040: 'Pénalités et amendes',
+  7050: 'Dons et subventions', 7060: 'Autres produits', 7070: 'Vente de livret',
+  6010: 'Secours versés (Caisse Rouge)', 6020: 'Frais administratifs', 6030: 'Frais bancaires CAP-AIDER', 6040: 'Autres charges',
+  6050: 'Réunion du comité', 6060: 'Dons accordés',
 };
 const ACCOUNT_USAGE = {
-  1010: 'Argent liquide en caisse (normalement zéro).', 1020: 'Compte de la mutuelle à CAP-AIDER.', 1210: 'Capital restant dû par les membres emprunteurs.',
-  2010: 'Sommes dues à des personnes extérieures (aucune pour le moment).',
-  3010: 'Cotisations Caisse Verte : épargne restituable aux membres.', 3050: 'Part des excédents mise en réserve (statuts art. 29.1).', 3090: 'Produits − charges de l’exercice (calculé).',
-  4010: 'Frais d’inscription des nouveaux membres.', 4020: 'Cotisations Caisse Rouge, non remboursables.', 4030: 'Amendes d’absence, de retard et de cotisation.',
-  4040: 'Intérêts des prêts (1,5 % dégressif).', 4050: 'Pénalités de retard sur prêts.', 4060: 'Dons et subventions reçus par la mutuelle.', 4090: 'Autres recettes.',
-  5010: 'Fournitures, carnets, frais de bureau.', 5020: 'Aides aux membres : maladie, mariage, urgence.', 5030: 'Frais prélevés par CAP-AIDER.',
-  5040: 'Collation, location de salle.', 5050: 'Dons et subventions faits par la mutuelle.', 5090: 'Autres dépenses.',
+  1010: 'Argent liquide en main', 1020: 'Compte bancaire à la CAP-AIDER', 1030: 'Parts / actions à la CAP-AIDER',
+  2010: 'Capital accordé non remboursé', 2020: 'Intérêts courus non encaissés', 2030: 'Pénalités dues non encaissées',
+  3010: 'Cumul cotisations vertes (2 000 HTG / membre)', 3020: 'Prêts, dons, subventions reçus de l’extérieur',
+  4010: 'Mouvements temporaires (trop-perçu, avances)', 4020: 'Dettes envers fournisseurs',
+  5010: 'Capital constitutif de la mutuelle', 5020: 'Capital de solidarité (cotisations rouges)', 5030: 'Bénéfices des exercices passés', 5040: 'Bénéfice ou déficit en cours (calculé)',
+  7010: '1 000 HTG par nouveau membre', 7020: 'Intérêts sur crédits aux membres', 7030: 'Intérêts sur capital social CAP-AIDER', 7040: 'Pénalités de retard, amendes de cotisation, d’absence et de retard',
+  7050: 'Fonds extérieurs gratuits', 7060: 'Produits divers', 7070: 'Livret perdu ou rempli',
+  6010: 'Aide aux membres : maladie, mariage, urgence', 6020: 'Fournitures, réunions, impression', 6030: 'Commissions et frais bancaires', 6040: 'Charges diverses',
+  6050: 'Frais des réunions du comité', 6060: 'Dons et subventions faits par la mutuelle (ajout)',
 };
 const DEP_CATS = [
-  { label: 'Frais administratifs', acc: 5010 },
-  { label: 'Frais bancaires CAP-AIDER', acc: 5030 },
-  { label: 'Frais de réunion', acc: 5040 },
-  { label: 'Secours maladie/mariage/urgence', acc: 5020 },
-  { label: 'Autres', acc: 5090 },
+  { label: 'Frais administratifs', acc: 6020 },
+  { label: 'Frais bancaires CAP-AIDER', acc: 6030 },
+  { label: 'Réunion du comité', acc: 6050 },
+  { label: 'Secours maladie/mariage/urgence', acc: 6010 },
+  { label: 'Autres', acc: 6040 },
 ];
-function depAccount(cat) { const c = DEP_CATS.find((x) => x.label === cat); return c ? c.acc : 5090; }
+const DEP_ALIASES = { 'Frais de réunion': 6050, 'Autres charges': 6040 };
+function depAccount(cat) { const c = DEP_CATS.find((x) => x.label === cat); return c ? c.acc : (DEP_ALIASES[cat] || 6040); }
+/* Amendes : compte et ligne de l'état des résultats selon le motif */
+function amendeAccount(motif) { return /carnet|livret/.test(motif || '') ? 7070 : 7040; }
+function amendeTag(motif) {
+  if (motif === 'cotisation') return 'amende_cot';
+  if (motif === 'absence' || motif === 'retard_reunion') return 'amende_abs';
+  if (/carnet|livret/.test(motif || '')) return 'livret';
+  return 'amende';
+}
 function cashAcc(mode) { return isBank(mode) ? 1020 : 1010; }
 function accClass(acc) { return +String(acc)[0]; }
+function isActifClass(c) { return c === 1 || c === 2; }
 
 function buildJournal() {
   const E = [];
@@ -292,10 +310,12 @@ function buildJournal() {
   DB.cotisations.forEach((c, i) => {
     const v = num(c.verte), r = num(c.rouge);
     add(c.date, 'COT-' + (i + 1), 'Cotisation ' + c.code + ' — ' + nameOf(c.code), [
-      { acc: cashAcc(c.mode), d: v + r }, { acc: 3010, c: v }, { acc: 4020, c: r }], 'cot');
+      { acc: cashAcc(c.mode), d: v + r }, { acc: 3010, c: v }, { acc: 5020, c: r }], 'cot');
   });
-  DB.amendes_paid.forEach((a, i) => add(a.date, 'AM-' + (i + 1), 'Amende ' + a.code + ' — ' + nameOf(a.code),
-    [{ acc: cashAcc(a.mode || BANK), d: a.montant }, { acc: 4030, c: a.montant }], 'am'));
+  DB.amendes_paid.forEach((a, i) => add(a.date, 'AM-' + (i + 1), (amendeTag(a.motif) === 'livret' ? 'Vente de livret ' : 'Amende ') + (a.code || '') + (a.code ? ' — ' + nameOf(a.code) : ''),
+    [{ acc: cashAcc(a.mode || BANK), d: a.montant }, { acc: amendeAccount(a.motif), c: a.montant, tag: amendeTag(a.motif) }], 'am'));
+  (DB.inscriptions || []).forEach((x, i) => add(x.date, 'INS-' + (i + 1), 'Frais d’inscription ' + x.code + ' — ' + nameOf(x.code),
+    [{ acc: cashAcc(x.mode || BANK), d: x.montant }, { acc: 7010, c: x.montant }], 'ins'));
   DB.depenses.forEach((d, i) => {
     // Dépense payée en caisse après un retrait à CAP-AIDER : le retrait est passé en écriture le même jour
     if (d.retrait) add(d.date, 'RET-' + (d.piece || i + 1), 'Retrait CAP-AIDER pour la dépense ' + (d.piece || ''), [{ acc: 1010, d: d.montant }, { acc: 1020, c: d.montant }], 'trf');
@@ -304,16 +324,19 @@ function buildJournal() {
   });
   DB.prets.forEach((p) => {
     add(p.date, 'PRET-' + p.id, 'Décaissement prêt ' + p.code_membre + ' — ' + nameOf(p.code_membre),
-      [{ acc: 1210, d: p.capital }, { acc: cashAcc(p.mode || BANK), c: p.capital }], 'pret');
+      [{ acc: 2010, d: p.capital }, { acc: cashAcc(p.mode || BANK), c: p.capital }], 'pret');
     (p.payments || []).forEach((x) => add(x.date, 'RMB-' + p.id + '-' + x.n, 'Remboursement prêt #' + p.id + ' éch. ' + x.n + ' — ' + p.code_membre, [
-      { acc: cashAcc(x.mode), d: x.montant }, { acc: 1210, c: x.cap }, { acc: 4040, c: x.int }, { acc: 4050, c: x.pen }], 'rmb'));
+      { acc: cashAcc(x.mode), d: x.montant }, { acc: 2010, c: x.cap }, { acc: 7020, c: x.int }, { acc: 7040, c: x.pen, tag: 'penalite' }], 'rmb'));
   });
   (DB.dons || []).forEach((d, i) => {
     const recu = d.sens !== 'accorde';
     add(d.date, 'DON-' + (i + 1), (d.nature || 'Don') + (recu ? ' reçu de ' : ' accordé à ') + (d.tiers || d.donateur || ''),
-      recu ? [{ acc: cashAcc(d.mode || BANK), d: d.montant }, { acc: 4060, c: d.montant }] : [{ acc: 5050, d: d.montant }, { acc: cashAcc(d.mode || BANK), c: d.montant }], 'don');
+      recu ? [{ acc: cashAcc(d.mode || BANK), d: d.montant }, { acc: 7050, c: d.montant }] : [{ acc: 6060, d: d.montant }, { acc: cashAcc(d.mode || BANK), c: d.montant }], 'don');
   });
   DB.transferts.forEach((t, i) => {
+    // Parts sociales achetées à la CAP-AIDER, et intérêts versés par la CAP-AIDER
+    if (t.sens === 'parts_capaider') { add(t.date, 'CAP-' + (i + 1), 'Capital social — parts CAP-AIDER', [{ acc: 1030, d: t.montant }, { acc: 1020, c: t.montant }], 'trf'); return; }
+    if (t.sens === 'interets_capaider') { add(t.date, 'ICAP-' + (i + 1), 'Intérêts reçus de la CAP-AIDER', [{ acc: 1020, d: t.montant }, { acc: 7030, c: t.montant }], 'trf'); return; }
     const toBank = t.sens !== 'retrait';
     add(t.date, 'TRF-' + (i + 1), toBank ? 'Dépôt de la caisse à la banque' : 'Retrait de la banque vers la caisse',
       toBank ? [{ acc: 1020, d: t.montant }, { acc: 1010, c: t.montant }] : [{ acc: 1010, d: t.montant }, { acc: 1020, c: t.montant }], 'trf');
@@ -341,15 +364,32 @@ function solde(B, acc) { const b = B[acc]; return b ? b.d - b.c : 0; }
 function financials(from, to) {
   const J = buildJournal(); const B = balances(J, from, to);
   const accs = Object.keys(B).map(Number);
-  const produits = accs.filter((a) => accClass(a) === 4).map((a) => ({ acc: a, v: B[a].pc - B[a].pd, cum: B[a].c - B[a].d }));
-  const charges = accs.filter((a) => accClass(a) === 5).map((a) => ({ acc: a, v: B[a].pd - B[a].pc, cum: B[a].d - B[a].c }));
+  const produits = accs.filter((a) => accClass(a) === 7).map((a) => ({ acc: a, v: B[a].pc - B[a].pd, cum: B[a].c - B[a].d }));
+  const charges = accs.filter((a) => accClass(a) === 6).map((a) => ({ acc: a, v: B[a].pd - B[a].pc, cum: B[a].d - B[a].c }));
   const totP = sum(produits, (x) => x.v), totC = sum(charges, (x) => x.v);
   const totPcum = sum(produits, (x) => x.cum), totCcum = sum(charges, (x) => x.cum);
-  const actif = [1010, 1020, 1210].map((a) => ({ acc: a, v: solde(B, a) }));
-  const passif = accs.filter((a) => accClass(a) === 2).map((a) => ({ acc: a, v: -solde(B, a) }));
-  const capitaux = [{ acc: 3010, v: -solde(B, 3010) }].concat(B[3050] ? [{ acc: 3050, v: -solde(B, 3050) }] : []).concat([{ acc: 3090, v: totPcum - totCcum }]);
-  produits.sort((a, b) => a.acc - b.acc); charges.sort((a, b) => a.acc - b.acc); passif.sort((a, b) => a.acc - b.acc);
-  return { J, B, produits, charges, totP, totC, resultat: totP - totC, resultatCum: totPcum - totCcum, actif, passif, capitaux,
+  // Bilan au format du trésorier : comptes affichés même à zéro
+  const actif = [1010, 1020, 1030, 2010, 2020, 2030].map((a) => ({ acc: a, v: solde(B, a) }));
+  const passif = [3010, 3020].concat(accs.filter((a) => accClass(a) === 4)).map((a) => ({ acc: a, v: -solde(B, a) }));
+  const capitaux = [5010, 5020, 5030].map((a) => ({ acc: a, v: -solde(B, a) })).concat([{ acc: 5040, v: totPcum - totCcum }]);
+  produits.sort((a, b) => a.acc - b.acc); charges.sort((a, b) => a.acc - b.acc);
+  // Détail de l'état des résultats (lignes du classeur du trésorier)
+  const f = from ? parseD(from) : null; const tt = to ? parseD(to) : null; const tag = {};
+  J.forEach((e) => { if ((f && e.date < f) || (tt && e.date > tt)) return; e.lines.forEach((l) => { if (l.tag) tag[l.tag] = (tag[l.tag] || 0) + num(l.c) - num(l.d); }); });
+  const P = (a) => { const x = produits.find((y) => y.acc === a); return x ? x.v : 0; };
+  const Cg = (a) => { const x = charges.find((y) => y.acc === a); return x ? x.v : 0; };
+  const lignesProduits = [
+    { l: 'Frais d’inscription', acc: 7010, v: P(7010) }, { l: 'Intérêts sur prêts accordés', acc: 7020, v: P(7020) },
+    { l: 'Intérêts CAP-AIDER', acc: 7030, v: P(7030) }, { l: 'Pénalités', acc: 7040, v: tag.penalite || 0 },
+    { l: 'Dons et subventions', acc: 7050, v: P(7050) }, { l: 'Amende / cotisation', acc: 7040, v: tag.amende_cot || 0 },
+    { l: 'Amende de retard et absence', acc: 7040, v: tag.amende_abs || 0 },
+  ].concat(tag.amende ? [{ l: 'Amendes (motif non précisé)', acc: 7040, v: tag.amende }] : [])
+    .concat([{ l: 'Vente de livret', acc: 7070, v: P(7070) }, { l: 'Autres produits', acc: 7060, v: P(7060) }]);
+  const lignesCharges = [
+    { l: 'Secours versés (Caisse Rouge)', acc: 6010, v: Cg(6010) }, { l: 'Frais administratifs', acc: 6020, v: Cg(6020) },
+    { l: 'Frais bancaires CAP-AIDER', acc: 6030, v: Cg(6030) }, { l: 'Réunion du comité', acc: 6050, v: Cg(6050) },
+  ].concat(Cg(6060) ? [{ l: 'Dons accordés', acc: 6060, v: Cg(6060) }] : []).concat([{ l: 'Autres charges', acc: 6040, v: Cg(6040) }]);
+  return { J, B, produits, charges, totP, totC, resultat: totP - totC, resultatCum: totPcum - totCcum, actif, passif, capitaux, lignesProduits, lignesCharges,
     totActif: sum(actif, (x) => x.v), totPassif: sum(passif, (x) => x.v) + sum(capitaux, (x) => x.v) };
 }
 
@@ -357,18 +397,18 @@ function financials(from, to) {
 function treasury(asOf) {
   const B = balances(buildJournal(), null, asOf);
   const t = asOf ? parseD(asOf) : null; const ok = (x) => !t || parseD(x.date) <= t;
-  const caisse = solde(B, 1010), banque = solde(B, 1020), prets = solde(B, 1210);
+  const caisse = solde(B, 1010), banque = solde(B, 1020), prets = solde(B, 2010), parts = solde(B, 1030);
   const verteCot = sum(DB.cotisations.filter(ok), (c) => c.verte);
   const rougeCot = sum(DB.cotisations.filter(ok), (c) => c.rouge);
   const deps = DB.depenses.filter(ok);
-  const depRouge = sum(deps.filter((d) => (d.caisse || (depAccount(d.categorie) === 5020 ? 'Caisse Rouge' : 'Caisse Verte')) === 'Caisse Rouge'), (d) => d.montant);
+  const depRouge = sum(deps.filter((d) => (d.caisse || (depAccount(d.categorie) === 6010 ? 'Caisse Rouge' : 'Caisse Verte')) === 'Caisse Rouge'), (d) => d.montant);
   const depVerte = sum(deps, (d) => d.montant) - depRouge;
   // Produits de la mutuelle (statuts art. 25.1 : vont en Caisse Verte), moins les dons accordés
-  const produitsVerte = -(solde(B, 4010) + solde(B, 4030) + solde(B, 4040) + solde(B, 4050) + solde(B, 4060) + solde(B, 4090)) - solde(B, 5050);
+  const produitsVerte = -[7010, 7020, 7030, 7040, 7050, 7060, 7070].reduce((t2, a) => t2 + solde(B, a), 0) - solde(B, 6060);
   // Caisse Verte (statuts art. 25.1) : cotisations vertes + amendes, intérêts, pénalités, frais d'inscription
   const verteFonds = verteCot + produitsVerte - depVerte;
   const rougeFonds = rougeCot - depRouge;
-  return { caisse, banque, prets, actif: caisse + banque + prets, verteFonds, verteDispo: verteFonds - prets, rougeFonds, verteCot, rougeCot, depRouge, depVerte };
+  return { caisse, banque, prets, parts, actif: caisse + banque + parts + prets, verteFonds, verteDispo: verteFonds - prets, rougeFonds, verteCot, rougeCot, depRouge, depVerte };
 }
 function monthsRange(fromKey, toKey) {
   const out = []; let [y, m] = fromKey.split('-').map(Number); const [ty, tm] = toKey.split('-').map(Number);

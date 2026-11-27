@@ -52,6 +52,7 @@ const AMENDE_TYPES = [
   { v: 'recherche', l: 'Frais de recherche (dépôt non prouvé)', key: 'frais_recherche' },
   { v: 'carnet_perdu', l: 'Carnet perdu', key: 'carnet_perdu' },
   { v: 'carnet_abime', l: 'Carnet sale ou déchiré', key: 'carnet_abime' },
+  { v: 'vente_livret', l: 'Vente de livret (perdu ou rempli)', key: null },
   { v: 'autre', l: 'Autre', key: null },
 ];
 /* Anciennes règles en pourcentage → montants fixes du règlement interne */
@@ -112,7 +113,7 @@ function clone(o) { return o === undefined ? undefined : JSON.parse(JSON.stringi
 let DB, USERS, RULES, GRILLE, SETTINGS, DOCS;
 function normalizeDB(d) {
   d = d || {};
-  ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'demandes_pret', 'transferts', 'reunions', 'dons', 'messages', 'suggestions', 'annonces']
+  ['members', 'cotisations', 'amendes_paid', 'depenses', 'prets', 'absences', 'demandes_pret', 'transferts', 'reunions', 'dons', 'messages', 'suggestions', 'annonces', 'inscriptions']
     .forEach((k) => { if (!Array.isArray(d[k])) d[k] = []; });
   d.members.forEach((m) => {
     ['can_see_documents', 'comite_see_demandes', 'comite_see_compta', 'comite_see_reports'].forEach((k) => {

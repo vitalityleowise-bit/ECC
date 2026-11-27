@@ -45,8 +45,11 @@ PAGES.balance = function () {
   let t1 = 0, t2 = 0, t3 = 0, t4 = 0;
   // Comptes classés par classe (1 Actif → 5 Charges), avec un sous-total par classe
   const rows = [];
-  [1, 2, 3, 4, 5].forEach((cl) => {
-    const list = accs.filter((a) => accClass(a) === cl); if (!list.length) return;
+  CLASS_ORDER.forEach((cl) => {
+    // Tous les comptes du plan sont listés, même à zéro (comme la feuille BALANCE_VERIFICATION)
+    const list = [...new Set(Object.keys(ACCOUNTS).map(Number).filter((a) => accClass(a) === cl && a !== 5040).concat(accs.filter((a) => accClass(a) === cl)))].sort((x, y) => x - y);
+    list.forEach((a) => { if (!B[a]) B[a] = { acc: a, d: 0, c: 0, pd: 0, pc: 0 }; });
+    if (!list.length) return;
     rows.push('<tr><td colspan="6" style="background:var(--navy-050);font-weight:700;color:var(--navy)">' + esc(ACCOUNT_CLASSES[cl]) + '</td></tr>');
     let c1 = 0, c2 = 0, c3 = 0, c4 = 0;
     list.forEach((a) => {
@@ -59,30 +62,36 @@ PAGES.balance = function () {
   });
   return pageHead('Comptabilité', 'Balance de vérification', 'Mouvements de la période et soldes cumulés · ' + esc(periodText()), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
     '<section class="panel">' + periodBar() + table(['Compte', 'Intitulé', ['Débit période', 'n'], ['Crédit période', 'n'], ['Solde débiteur cumulé', 'n'], ['Solde créditeur cumulé', 'n']], rows,
-      '<tr><td colspan="2">Totaux ' + (Math.abs(t3 - t4) < 0.01 ? '— équilibrée' : '— ÉCART') + '</td><td class="n">' + fmt(t1) + '</td><td class="n">' + fmt(t2) + '</td><td class="n">' + fmt(t3) + '</td><td class="n">' + fmt(t4) + '</td></tr>') + '</section>';
+      '<tr><td colspan="2">TOTAUX ' + (Math.abs(t3 - t4) < 0.01 ? '— ✅ BALANCE ÉQUILIBRÉE' : '— ❌ ÉCART') + '</td><td class="n">' + fmt(t1) + '</td><td class="n">' + fmt(t2) + '</td><td class="n">' + fmt(t3) + '</td><td class="n">' + fmt(t4) + '</td></tr>') + '</section>';
 };
+/* Bilan au format du classeur du trésorier : Actif | Passif + capitaux propres */
+const SEC = (t2) => '<tr><td colspan="3" style="background:var(--navy-050);font-weight:700;color:var(--navy);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase">' + esc(t2) + '</td></tr>';
 function bilanHTML(to) {
   const F = financials(null, to);
   const line = (x) => '<tr><td class="code">' + x.acc + '</td><td>' + esc(accLabel(x.acc)) + '</td><td class="n">' + fmt(x.v) + '</td></tr>';
+  const ok = Math.abs(F.totActif - F.totPassif) < 0.01;
   return '<div class="grid-2">' +
-    panel('Actif', table(['Compte', 'Intitulé', ['Montant', 'n']], F.actif.map(line), '<tr><td colspan="2">Total actif</td><td class="n">' + fmt(F.totActif) + '</td></tr>'), { flush: true }) +
-    panel('Passif et capitaux propres', table(['Compte', 'Intitulé', ['Montant', 'n']],
-      ['<tr><td colspan="3" style="background:var(--navy-050);font-weight:700;color:var(--navy)">Passif (classe 2)</td></tr>'].concat(F.passif.length ? F.passif.map(line) : ['<tr><td colspan="3" class="muted">Aucune dette envers des tiers</td></tr>'])
-        .concat(['<tr><td colspan="3" style="background:var(--navy-050);font-weight:700;color:var(--navy)">Capitaux propres (classe 3)</td></tr>']).concat(F.capitaux.map(line)), '<tr><td colspan="2">Total passif + capitaux</td><td class="n">' + fmt(F.totPassif) + '</td></tr>'), { flush: true }) +
-    '</div><div class="banner ' + (Math.abs(F.totActif - F.totPassif) < 0.01 ? 'soft' : 'import') + '"><span>' + (Math.abs(F.totActif - F.totPassif) < 0.01 ? 'Bilan équilibré.' : 'Écart de ' + money(F.totActif - F.totPassif)) + '</span></div>';
+    panel('Actif', table(['Compte', 'Désignation', ['Montant', 'n']],
+      [SEC('Actif — trésorerie')].concat(F.actif.filter((x) => accClass(x.acc) === 1).map(line)).concat([SEC('Actif — créances')]).concat(F.actif.filter((x) => accClass(x.acc) === 2).map(line)),
+      '<tr><td colspan="2">TOTAL ACTIF</td><td class="n">' + fmt(F.totActif) + '</td></tr>'), { flush: true }) +
+    panel('Passif + capitaux propres', table(['Compte', 'Désignation', ['Montant', 'n']],
+      [SEC('Passif')].concat(F.passif.map(line)).concat([SEC('Capitaux propres')]).concat(F.capitaux.map(line)),
+      '<tr><td colspan="2">TOTAL PASSIF + CAPITAUX</td><td class="n">' + fmt(F.totPassif) + '</td></tr>'), { flush: true }) +
+    '</div><div class="banner ' + (ok ? 'soft' : 'import') + '"><span>' + (ok ? '✅ BILAN ÉQUILIBRÉ — ACTIF = PASSIF + CAPITAUX PROPRES' : '❌ ÉCART : ' + money(F.totActif - F.totPassif)) + '</span></div>';
 }
 PAGES.bilan = function () {
   const p = STATE.period || {};
   return pageHead('Comptabilité', 'Bilan', 'Situation au ' + esc(p.to ? fmtD(p.to) : fmtD(today())), '<button class="btn" onclick="window.print()">' + t('print') + '</button>') +
     '<section class="panel">' + periodBar('Le bilan utilise la date de fin') + '</section>' + bilanHTML(p.to);
 };
+/* État des résultats au format du classeur du trésorier */
 function resultatsHTML(from, to) {
   const F = financials(from, to);
-  const line = (x) => '<tr><td class="code">' + x.acc + '</td><td>' + esc(accLabel(x.acc)) + '</td><td class="n">' + fmt(x.v) + '</td></tr>';
-  return '<div class="grid-2">' +
-    panel('Produits', table(['Compte', 'Intitulé', ['Montant', 'n']], F.produits.map(line), '<tr><td colspan="2">Total produits</td><td class="n">' + fmt(F.totP) + '</td></tr>'), { flush: true }) +
-    panel('Charges', table(['Compte', 'Intitulé', ['Montant', 'n']], F.charges.map(line), '<tr><td colspan="2">Total charges</td><td class="n">' + fmt(F.totC) + '</td></tr>'), { flush: true }) +
-    '</div><div class="kpis">' + kpi('Résultat de la période', fmt(F.resultat) + ' <small>HTG</small>', F.resultat >= 0 ? 'excédent' : 'déficit', F.resultat >= 0 ? 'green' : 'red', F.resultat >= 0 ? 'pos' : 'neg') + '</div>';
+  const row = (x) => '<tr><td>' + esc(x.l) + '</td><td class="code">' + x.acc + '</td><td class="n">' + fmt(x.v) + '</td></tr>';
+  return panel('État des résultats', table(['Désignation', 'Compte', ['Montant', 'n']],
+      [SEC('Produits')].concat(F.lignesProduits.map(row)).concat(['<tr style="font-weight:700"><td colspan="2">TOTAL PRODUITS</td><td class="n">' + fmt(F.totP) + '</td></tr>'])
+        .concat([SEC('Charges')]).concat(F.lignesCharges.map(row)).concat(['<tr style="font-weight:700"><td colspan="2">TOTAL CHARGES</td><td class="n">' + fmt(F.totC) + '</td></tr>']),
+      '<tr><td colspan="2">SURPLUS / DÉFICIT DE L’EXERCICE</td><td class="n" style="color:' + (F.resultat >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmt(F.resultat) + '</td></tr>'), { flush: true });
 }
 PAGES.resultats = function () {
   const p = STATE.period || {};
@@ -181,8 +190,7 @@ function joinList(arr) { return arr.length <= 1 ? arr.join('') : arr.slice(0, -1
 function resumeBlocks(r) {
   const c = r.ctx; const T = c.T; const F = c.F; const mois = monthLabel(r.key).toLowerCase();
   const fin = fmtD(c.to); const B = [];
-  const actif = F.actif.filter((x) => x.v); const prod = F.produits.filter((x) => x.v); const chg = F.charges.filter((x) => x.v);
-  const verteEpargne = (F.capitaux.find((x) => x.acc === 3010) || { v: 0 }).v;
+  const actif = F.actif.filter((x) => x.v); const prod = F.lignesProduits.filter((x) => x.v); const chg = F.lignesCharges.filter((x) => x.v);
   B.push({ h: '1. Situation générale' });
   if (c.carried && c.carried.length) B.push({ p: 'Ce rapport présente aussi les opérations de ' + joinList(c.carried.map((k) => monthLabel(k).toLowerCase())) + ', mois sans réunion valide (pas de réunion ou pas de quorum), reportées conformément au règlement.' });
   B.push({ p: 'Au ' + fin + ', UNIE-MUSO compte ' + c.actifs.length + ' membres actifs sur ' + DB.members.length + ' inscrits. ' +
@@ -194,13 +202,15 @@ function resumeBlocks(r) {
   B.push({ p: 'Le total de l’actif s’élève à ' + money(F.totActif) + '. Il se compose de : ' + joinList(actif.map(accLine)) + '. ' +
     (T.caisse ? 'Une liquidité de ' + money(T.caisse) + ' reste en caisse et devra être déposée à CAP-AIDER. ' : 'Toute la trésorerie de la mutuelle est déposée à la banque CAP-AIDER. ') +
     'Les prêts aux membres représentent ' + pct(T.prets, F.totActif) + ' % de l’actif.' });
-  B.push({ p: 'Au passif, ' + (F.totPassif - sum(F.capitaux, (x) => x.v) ? 'les dettes envers des tiers s’élèvent à ' + money(F.totPassif - sum(F.capitaux, (x) => x.v)) + '. ' : 'la mutuelle n’a aucune dette envers des tiers (classe 2 : 0 HTG). ') +
-    'Les capitaux propres atteignent ' + money(sum(F.capitaux, (x) => x.v)) + ' : l’épargne des membres déposée en Caisse Verte (compte 3010) pour ' + money(verteEpargne) + ', et le résultat de l’exercice (compte 3090) pour ' + money((F.capitaux.find((x) => x.acc === 3090) || { v: 0 }).v) + '. ' +
+  const pv = (a2) => ((F.passif.concat(F.capitaux)).find((x) => x.acc === a2) || { v: 0 }).v;
+  B.push({ p: 'Au passif figure l’épargne des membres en Caisse Verte (compte 3010) pour ' + money(pv(3010)) + (pv(3020) ? ', ainsi que des fonds extérieurs reçus (compte 3020) pour ' + money(pv(3020)) : '') + '. ' +
+    'Les capitaux propres s’élèvent à ' + money(sum(F.capitaux, (x) => x.v)) + ' : Caisse Rouge, capital de solidarité (compte 5020), ' + money(pv(5020)) +
+    (pv(5010) ? ' ; capital social (5010), ' + money(pv(5010)) : '') + (pv(5030) ? ' ; réserves (5030), ' + money(pv(5030)) : '') + ' ; surplus de l’exercice (compte 5040), ' + money(pv(5040)) + '. ' +
     (Math.abs(F.totActif - F.totPassif) < 0.01 ? 'Le bilan est équilibré (' + money(F.totActif) + ' à l’actif comme au passif).' : 'Attention : le bilan présente un écart de ' + money(F.totActif - F.totPassif) + '.') });
   B.push({ table: 'bilan' });
   B.push({ h: '3. Résultat du mois (' + mois + ')' });
-  B.push({ p: 'Les produits du mois s’élèvent à ' + money(F.totP) + (prod.length ? ' : ' + joinList(prod.map(accLine)) : '') + '. ' +
-    'Les charges s’élèvent à ' + money(F.totC) + (chg.length ? ' : ' + joinList(chg.map(accLine)) : ' (aucune dépense ce mois-ci)') + '. ' +
+  B.push({ p: 'Les produits du mois s’élèvent à ' + money(F.totP) + (prod.length ? ' : ' + joinList(prod.map((x) => x.l + ' (' + x.acc + ') : ' + money(x.v))) : '') + '. ' +
+    'Les charges s’élèvent à ' + money(F.totC) + (chg.length ? ' : ' + joinList(chg.map((x) => x.l + ' (' + x.acc + ') : ' + money(x.v))) : ' (aucune dépense ce mois-ci)') + '. ' +
     'Le mois se solde par ' + (F.resultat >= 0 ? 'un excédent' : 'un déficit') + ' de ' + money(Math.abs(F.resultat)) + '. Depuis le début de l’activité, le résultat cumulé est de ' + money(F.resultatCum) + '.' });
   B.push({ table: 'resultat' });
   B.push({ h: '4. Cotisations' });
@@ -210,7 +220,7 @@ function resumeBlocks(r) {
     'Les amendes encaissées ce mois s’élèvent à ' + money(sum(c.am, (x) => x.montant)) + ' (' + c.am.length + ').' });
   B.push({ h: '5. Crédit' });
   B.push({ p: (c.pretsM.length ? c.pretsM.length + ' prêt(s) ont été octroyés ce mois pour ' + money(sum(c.pretsM, (x) => x.capital)) + ' (' + joinList(c.pretsM.map((x) => nameOf(x.code_membre))) + '). ' : 'Aucun nouveau prêt n’a été octroyé ce mois. ') +
-    'À la fin du mois, ' + c.enCours.length + ' prêt(s) sont en cours, avec ' + money(T.prets) + ' de capital restant dû (compte 1210) et ' + money(sum(c.enCours, (x) => loanTotals(x).reste)) + ' restant à rembourser, intérêts compris. ' +
+    'À la fin du mois, ' + c.enCours.length + ' prêt(s) sont en cours, avec ' + money(T.prets) + ' de capital restant dû (compte 2010) et ' + money(sum(c.enCours, (x) => loanTotals(x).reste)) + ' restant à rembourser, intérêts compris. ' +
     (c.dues.length ? c.dues.filter((x) => x.payment).length + ' mensualité(s) sur ' + c.dues.length + ' arrivées à échéance ce mois ont été payées. ' : '') +
     'Les remboursements reçus s’élèvent à ' + money(sum(c.rmb, (x) => x.montant)) + ', dont ' + money(sum(c.rmb, (x) => x.int)) + ' d’intérêts. ' +
     (c.lateLoans.length ? c.lateLoans.length + ' prêt(s) présentent des mensualités en retard. ' : 'Aucun prêt ne présente de retard. ') +
@@ -232,9 +242,10 @@ function resumeTables(kind, r) {
       table(['Compte', 'Actif', ['HTG', 'n']], F.actif.map(line), '<tr><td colspan="2">Total actif</td><td class="n">' + fmt(F.totActif) + '</td></tr>') +
       table(['Compte', 'Passif et capitaux propres', ['HTG', 'n']], F.passif.concat(F.capitaux).map(line), '<tr><td colspan="2">Total passif</td><td class="n">' + fmt(F.totPassif) + '</td></tr>') + '</div>';
   }
+  const row = (x) => '<tr><td>' + esc(x.l) + '</td><td class="code">' + x.acc + '</td><td class="n">' + fmt(x.v) + '</td></tr>';
   return '<div class="grid-2" style="margin:6px 0 12px">' +
-    table(['Compte', 'Produits du mois', ['HTG', 'n']], F.produits.map((x) => line({ acc: x.acc, v: x.v })), '<tr><td colspan="2">Total produits</td><td class="n">' + fmt(F.totP) + '</td></tr>') +
-    table(['Compte', 'Charges du mois', ['HTG', 'n']], F.charges.length ? F.charges.map((x) => line({ acc: x.acc, v: x.v })) : ['<tr><td colspan="3" class="muted">Aucune charge</td></tr>'], '<tr><td colspan="2">Résultat</td><td class="n">' + fmt(F.resultat) + '</td></tr>') + '</div>';
+    table(['Produits du mois', 'Compte', ['HTG', 'n']], F.lignesProduits.filter((x) => x.v).map(row).concat(F.lignesProduits.some((x) => x.v) ? [] : ['<tr><td colspan="3" class="muted">Aucun produit</td></tr>']), '<tr><td colspan="2">TOTAL PRODUITS</td><td class="n">' + fmt(F.totP) + '</td></tr>') +
+    table(['Charges du mois', 'Compte', ['HTG', 'n']], F.lignesCharges.filter((x) => x.v).map(row).concat(F.lignesCharges.some((x) => x.v) ? [] : ['<tr><td colspan="3" class="muted">Aucune charge</td></tr>']), '<tr><td colspan="2">SURPLUS / DÉFICIT</td><td class="n">' + fmt(F.resultat) + '</td></tr>') + '</div>';
 }
 /* Texte personnalisé du trésorier (par mois) : « ## » = titre, ligne vide = nouveau paragraphe */
 function customResume(key) { return (SETTINGS.resume_text || {})[key] || ''; }

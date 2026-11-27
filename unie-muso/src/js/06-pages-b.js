@@ -184,7 +184,7 @@ function saveDep(v, idx) {
   if (num(v.montant) <= 0) { toast('Montant invalide.', 'err'); return false; }
   const benef = v.benef_sel && v.benef_sel !== '__autre' ? v.benef_sel : (v.beneficiaire || '').trim();
   // Caisse déduite de la catégorie (règlement : secours → Caisse Rouge ; frais courants → produits / Caisse Verte)
-  const rec = { date: fmtD(v.date), piece: v.piece.trim(), caisse: depAccount(v.categorie) === 5020 ? 'Caisse Rouge' : 'Caisse Verte', explication: (v.explication || '').trim(), beneficiaire: benef, categorie: v.categorie, montant: num(v.montant), mode: v.mode, retrait: v.mode === CASH && !!v.retrait, recu: v.recu };
+  const rec = { date: fmtD(v.date), piece: v.piece.trim(), caisse: depAccount(v.categorie) === 6010 ? 'Caisse Rouge' : 'Caisse Verte', explication: (v.explication || '').trim(), beneficiaire: benef, categorie: v.categorie, montant: num(v.montant), mode: v.mode, retrait: v.mode === CASH && !!v.retrait, recu: v.recu };
   if (idx === undefined) DB.depenses.push(rec); else DB.depenses[idx] = rec;
   saveDB(); toast('Dépense enregistrée.', 'ok'); render();
 }
@@ -264,12 +264,21 @@ PAGES.caisse = function () {
 };
 PAGES.banque = function () {
   const T = treasury();
-  return pageHead('Trésorerie', t('banque'), 'Compte de la mutuelle à CAP-AIDER') +
+  return pageHead('Trésorerie', t('banque'), 'Compte de la mutuelle à CAP-AIDER',
+      canEdit() ? '<button class="btn" data-act="capNew" data-id="interets_capaider">Intérêts reçus de la CAP-AIDER</button><button class="btn btn-primary" data-act="capNew" data-id="parts_capaider">Achat de parts sociales CAP-AIDER</button>' : '') +
     '<div class="kpis">' + kpi('Solde CAP-AIDER', fmt(T.banque) + ' <small>HTG</small>', '', 'navy', T.banque < 0 ? 'neg' : '') +
+      kpi('Capital social CAP-AIDER', fmt(T.parts) + ' <small>HTG</small>', 'parts (compte 1030)', 'green') +
       kpi('Prêts dehors', fmt(T.prets) + ' <small>HTG</small>', 'capital restant dû', 'orange') + kpi('Actif total', fmt(T.actif) + ' <small>HTG</small>', '', 'green') + '</div>' +
     (T.banque < 0 ? '<div class="banner import"><span>Solde négatif : il manque probablement des cotisations. Importez votre sauvegarde complète ou saisissez les cotisations.</span></div>' : '') +
     panel('Mouvements récents', movTable(1020), { flush: true });
 };
+/* Parts sociales achetées à la CAP-AIDER (1030) et intérêts reçus de la CAP-AIDER (7030) */
+ACTIONS.capNew = (sens) => openModal({
+  title: sens === 'parts_capaider' ? 'Achat de parts sociales CAP-AIDER' : 'Intérêts reçus de la CAP-AIDER', submit: t('save'),
+  body: '<div class="form-grid">' + field(t('date'), input('date', toISO(today()), 'type="date"')) + field(t('amount') + ' (HTG)', input('montant', '', 'type="number" min="0" step="any" required')) +
+    field('Référence', input('ref', ''), 'full') + '</div>',
+  onSubmit: (d) => { if (num(d.montant) <= 0) { toast('Montant invalide.', 'err'); return false; } DB.transferts.push({ date: fmtD(d.date), montant: num(d.montant), sens, ref: d.ref }); saveDB(); toast('Opération enregistrée.', 'ok'); render(); },
+});
 ACTIONS.trfNew = (sens) => openModal({
   title: sens === 'retrait' ? 'Retrait de la banque vers la caisse' : 'Dépôt de la caisse à la banque', submit: t('save'),
   body: '<div class="form-grid">' + field(t('date'), input('date', toISO(today()), 'type="date"')) + field(t('amount') + ' (HTG)', input('montant', sens === 'retrait' ? '' : Math.max(0, treasury().caisse), 'type="number" min="0" step="any"')) +
