@@ -304,9 +304,14 @@ function setMyLang(l) {
 const ACTIONS = {};
 /* Groupes du menu ouverts / fermés, mémorisés sur l'appareil (Gestion ouvert la première fois) */
 const MENU_KEY = 'uniemuso-menu-open';
-function menuState() { try { return JSON.parse(store.raw(MENU_KEY) || '{"g_gestion":true}'); } catch (_e) { return { g_gestion: true }; } }
+/* État gardé en mémoire (fonctionne même si l'appareil bloque le stockage), copié sur l'appareil si possible */
+let MENU_MEM = null;
+function menuState() {
+  if (!MENU_MEM) { try { MENU_MEM = JSON.parse(store.raw(MENU_KEY) || '{"g_gestion":true}'); } catch (_e) { MENU_MEM = { g_gestion: true }; } }
+  return MENU_MEM;
+}
 function groupOpen(g, active) { const st = menuState(); return st[g] === undefined ? !!active : !!st[g]; }
-function setGroupOpen(g, v) { const st = menuState(); st[g] = v; store.rawSet(MENU_KEY, JSON.stringify(st)); }
+function setGroupOpen(g, v) { menuState()[g] = v; store.rawSet(MENU_KEY, JSON.stringify(MENU_MEM)); }
 ACTIONS.toggleGroup = (g) => {
   const active = PAGE_DEFS.some((p) => p.g === g && p.id === STATE.page);
   setGroupOpen(g, !groupOpen(g, active)); render();
