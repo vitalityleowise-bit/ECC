@@ -1,9 +1,25 @@
 'use strict';
 /* UNIE-MUSO pour Windows : fenêtre application + dossier de données Documents\UNIE-MUSO
    + ouverture des fichiers .unimiso + alarmes de réunion (icône dans la zone de notification). */
-const { app, BrowserWindow, ipcMain, shell, Notification, Tray, Menu, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, Tray, Menu, nativeImage, dialog, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
+
+/* La page est servie sur app://unie-muso/ (origine sécurisée) : la version en ligne (Firebase)
+   refuse les pages file://. Les données locales restent dans Documents\UNIE-MUSO. */
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+]);
+function registerAppProtocol() {
+  const root = path.join(__dirname, 'app');
+  protocol.handle('app', (req) => {
+    const rel = decodeURIComponent(new URL(req.url).pathname).replace(/^\/+/, '') || 'UNIE-MUSO.html';
+    const file = path.normalize(path.join(root, rel));
+    if (!file.startsWith(root + path.sep)) return new Response('Interdit', { status: 403 });
+    return net.fetch(pathToFileURL(file).toString());
+  });
+}
 
 const APP_ID = 'ht.uniemuso.app';
 let win = null;
@@ -45,7 +61,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
   });
   win.setMenuBarVisibility(false);
-  win.loadFile(path.join(__dirname, 'app', 'UNIE-MUSO.html'));
+  win.loadURL('app://unie-muso/UNIE-MUSO.html');
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) { shell.openExternal(url); return { action: 'deny' }; }
     return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: path.join(__dirname, 'icon.ico') } };
@@ -126,6 +142,7 @@ if (!app.requestSingleInstanceLock()) {
     const f = fileFromArgv(process.argv);
     if (f) pendingImport = readImport(f);
     dataDir();
+    registerAppProtocol();
     createWindow();
     createTray();
     // Démarre (caché) à l'ouverture de session pour que les rappels de réunion fonctionnent

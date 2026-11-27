@@ -6,8 +6,8 @@ android {
         applicationId 'ht.uniemuso.app'
         minSdk 24
         targetSdk 34
-        versionCode 6
-        versionName '3.5.0'
+        versionCode 7
+        versionName '3.6.0'
     }
     signingConfigs {
         release {
@@ -24,4 +24,5 @@ android {
 }
 dependencies {
     implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.webkit:webkit:1.11.0'
 }

@@ -12,10 +12,14 @@ import android.os.Bundle;
 import android.os.Parcelable;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
+import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONObject;
 
@@ -45,9 +49,17 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setTextZoom(100);
         web.addJavascriptInterface(new NativeBridge(this, web), "UnieNative");
+        // L'application est servie sur une adresse https locale (appassets) : la version en ligne
+        // (Firebase) exige une vraie origine https, ce que file:// ne fournit pas.
+        final WebViewAssetLoader assets = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient() {
             @Override public void onPageFinished(WebView v, String url) { pageReady = true; }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest req) {
+                return assets.shouldInterceptRequest(req.getUrl());
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView v, String url) {
+                if (url.startsWith("https://" + WebViewAssetLoader.DEFAULT_DOMAIN)) return false;
                 if (url.startsWith("http")) { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); return true; }
                 return false;
             }
@@ -68,7 +80,7 @@ public class MainActivity extends Activity {
             }
         });
         handleIntent(getIntent());
-        web.loadUrl("file:///android_asset/UNIE-MUSO.html");
+        web.loadUrl("https://" + WebViewAssetLoader.DEFAULT_DOMAIN + "/assets/UNIE-MUSO.html");
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
         }
