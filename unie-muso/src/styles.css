@@ -441,21 +441,31 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .pv-due { grid-template-columns: 1fr; }
   .pv-grid { grid-template-columns: 1fr; }
 }
-/* Carte de membre : bleue si à jour, rouge clair sinon */
-.pv-card.is-late { background: radial-gradient(circle at 105% -10%, rgba(255,255,255,.22) 0 28%, transparent 29%), linear-gradient(135deg, #D9534F 0%, #E86A5F 55%, #EF8577 100%); box-shadow: 0 10px 24px rgba(217,83,79,.28); }
-.pv-card.is-late .pv-kind, .pv-card.is-late .pv-code, .pv-card.is-late .pv-card-foot, .pv-card.is-late .pv-brand small { color: rgba(255,255,255,.92); }
+/* Carte de membre, style pastel (choisi par le trésorier) : bleu pâle si à jour, rouge pâle sinon */
+.pv-card { color: var(--ink); box-shadow: none; }
+.pv-card::after { border-color: rgba(26,58,107,.05); }
+.pv-card.is-ok { background: linear-gradient(135deg, #E3ECFA, #F3F7FD); border: 1px solid #C8D7EF; }
+.pv-card.is-late { background: linear-gradient(135deg, #FBE3E1, #FDF2F1); border: 1px solid #F2C4C0; }
+.pv-card .pv-ph { background: #fff; border-color: #1A3A6B; }
+.pv-card.is-late .pv-ph { border-color: #D9534F; }
+.pv-card .pv-ph span { color: #1A3A6B; }
+.pv-card .pv-nm, .pv-card .pv-brand { color: #1A3A6B; }
+.pv-card .pv-code, .pv-card .pv-card-foot, .pv-card .pv-brand small, .pv-card .pv-kind small { color: #5A6780; }
+.pv-card .pv-kind { color: #E8650A; }
+.pv-card .pv-card-foot { border-top-color: rgba(26,58,107,.12); }
 .pv-card-top { gap: 10px; }
 .pv-logo { width: 38px; height: 38px; border-radius: 10px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
 .pv-logo img { width: 32px; height: 32px; object-fit: contain; }
 .pv-brand { display: grid; line-height: 1.15; margin-right: auto; }
-.pv-brand small, .pv-kind small { font-size: 9.5px; letter-spacing: .08em; font-weight: 600; opacity: .85; text-transform: none; }
+.pv-brand small, .pv-kind small { font-size: 9.5px; letter-spacing: .08em; font-weight: 600; text-transform: none; }
 .pv-kind { display: grid; text-align: right; line-height: 1.15; }
-.pv-mini { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); background: rgba(255,255,255,.12); border-radius: 12px; margin-bottom: 10px; }
-.pv-mini > div { padding: 8px 6px; display: grid; gap: 1px; text-align: center; border-left: 1px solid rgba(255,255,255,.18); min-width: 0; }
+.pv-mini { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); background: rgba(255,255,255,.7); border-radius: 12px; margin-bottom: 10px; }
+.pv-mini > div { padding: 8px 6px; display: grid; gap: 1px; text-align: center; border-left: 1px solid rgba(26,58,107,.10); min-width: 0; }
 .pv-mini > div:first-child { border-left: 0; }
-.pv-mini b { font-size: 16px; font-weight: 800; }
-.pv-mini span { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; opacity: .85; }
-.pv-state { position: relative; z-index: 1; display: grid; gap: 2px; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-weight: 800; font-size: 15px; letter-spacing: .02em; background: rgba(255,255,255,.18); }
-.pv-card.is-ok .pv-state { background: rgba(102,187,106,.30); border: 1px solid rgba(165,214,167,.55); }
-.pv-state small { font-weight: 500; font-size: 12px; opacity: .92; letter-spacing: 0; }
+.pv-mini b { font-size: 16px; font-weight: 800; color: #1A3A6B; }
+.pv-mini span { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #5A6780; }
+.pv-state { position: relative; z-index: 1; display: grid; gap: 2px; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-weight: 800; font-size: 15px; letter-spacing: .02em; background: #fff; }
+.pv-card.is-ok .pv-state { color: #2E7D32; }
+.pv-card.is-late .pv-state { color: #C62828; }
+.pv-state small { font-weight: 500; font-size: 12px; letter-spacing: 0; }
 .pv-card .pv-tag.ok { background: #E3F4E5; }
