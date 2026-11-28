@@ -403,23 +403,32 @@ function profileInfos(m, anc) {
 function profilePhoto(m, cls) { return '<div class="' + cls + '">' + (m.photo ? '<img alt="Photo de ' + esc(memberName(m)) + '" src="' + esc(m.photo) + '">' : '<span>' + esc(initials(m)) + '</span>') + '</div>'; }
 const PROFILE_FIX = '<p class="pv-fix">Une information manque ou est fausse ? Écrivez au comité plus bas : le trésorier mettra votre fiche à jour.</p>';
 function profileTop(m, s, anc) {
-  const st = SETTINGS.profile_style || 'classique';
+  const st = SETTINGS.profile_style || 'carte';
   const meet = esc(longDate(nextMeeting())) + ' · ' + esc(SETTINGS.meeting_hour);
   const infos = profileInfos(m, anc);
   const rows = (list) => list.map((x) => '<div class="pv-row"><span>' + esc(x[0]) + '</span><b>' + (x[1] ? esc(x[1]) : '<i>—</i>') + '</b></div>').join('');
   const pct = s.attendu ? Math.min(100, Math.round(s.total / s.attendu * 100)) : 100;
   if (st === 'carte') {
-    return '<section class="pv-card-wrap"><div class="pv-card">' +
+    // Carte verte si le membre est à jour (cotisations, amendes, prêt), rouge sinon, avec la raison
+    const loan = activeLoan(m.code); const nx = loan ? nextInstallment(loan) : null;
+    const pretRetard = !!(nx && daysBetween(today(), nx.due) < 0);
+    const why = [];
+    if (s.reste > 0) why.push('Kotizasyon an reta: ' + money(s.reste));
+    if (s.amendesDues > 0) why.push('Amand pou peye: ' + money(s.amendesDues));
+    if (pretRetard) why.push('Mansyalite prè an reta');
+    const ok = !why.length;
+    return '<section class="pv-card-wrap"><div class="pv-card ' + (ok ? 'is-ok' : 'is-late') + '">' +
         '<div class="pv-card-top"><span class="pv-brand">UNIE-MUSO</span><span class="pv-kind">Kat manm</span></div>' +
         '<div class="pv-card-main">' + profilePhoto(m, 'pv-ph') +
           '<div class="pv-card-id"><div class="pv-nm">' + esc(memberName(m)) + '</div>' +
           '<div class="pv-code">' + m.code + '</div>' +
           '<div class="pv-tags"><span class="pv-tag ' + (m.statut === 'Actif' ? 'ok' : '') + '">' + esc(m.statut) + '</span>' + (m.is_comite ? '<span class="pv-tag gold">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div></div></div>' +
+        '<div class="pv-state">' + (ok ? '✓ A jou' : '! Pa a jou') + '<small>' + (ok ? 'Kotizasyon, amand ak prè: tout peye' : esc(why.join(' · '))) + '</small></div>' +
         '<div class="pv-card-foot"><span>Manm depi ' + esc(m.date_adhesion || '—') + '</span><span>Petit-Goâve · Haïti</span></div>' +
       '</div>' +
       '<div class="pv-tiles"><div class="pv-tile pay"><span>' + t('to_pay') + '</span><b class="num">' + money(s.totalAVerser) + '</b><small>pwochen reyinyon</small></div>' +
         '<div class="pv-tile"><span>' + t('next_meeting') + '</span><b>' + meet + '</b><small>' + (s.reste ? 'Reta: ' + money(s.reste) : 'Kotizasyon a jou') + '</small></div></div>' +
-      '<div class="panel pv-info"><div class="panel-head"><h2>Mes informations</h2></div><div class="pv-rows">' + rows(infos) + '</div>' + PROFILE_FIX + '</div></section>';
+      '<details class="panel pv-more pv-info"><summary>Mes informations personnelles</summary><div class="pv-rows">' + rows(infos) + '</div>' + PROFILE_FIX + '</details></section>';
   }
   if (st === 'banniere') {
     return '<section class="panel pv-ban"><div class="pv-cover"></div>' + profilePhoto(m, 'pv-ph') +
