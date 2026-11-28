@@ -335,12 +335,19 @@ function memberCommPanel(m) {
   if ((DB.messages || []).some((x) => x.from_code === m.code && (x.replies || []).length > (x.replies_seen || 0))) markMemberRead(m.code, 'replies');
   const mine = (DB.messages || []).filter((x) => x.from_code === m.code).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const sugg = (DB.suggestions || []).filter((x) => x.from_code === m.code);
-  return '<section class="panel"><div class="panel-head"><h2>Messages au comité</h2><div class="right"><button class="btn btn-sm btn-primary" data-act="msgNew">Écrire au comité</button>' +
+  return '<section class="panel" id="msg-panel"><div class="panel-head"><h2>Messages au comité</h2><div class="right"><button class="btn btn-sm btn-primary" data-act="msgNew">Écrire au comité</button>' +
     '<button class="btn btn-sm" data-act="suggNew">Donner une suggestion</button></div></div><div class="panel-body">' +
     (mine.length ? mine.map((x) => messageThread(x, false)).join('') : '<span class="muted">Besoin d’une information ? Écrivez au comité : il vous répondra ici.</span>') +
     (sugg.length ? '<h4 style="margin:12px 0 6px">Mes suggestions</h4>' + sugg.map((s) => '<p style="margin:0 0 6px">• ' + esc(s.texte) + (s.reponse ? '<br><span class="muted">Réponse : ' + esc(s.reponse) + '</span>' : '') + '</p>').join('') : '') +
     '</div></section>';
 }
+
+/* Bouton flottant « Messages » (voir msgFabHTML) */
+ACTIONS.msgFab = () => {
+  if (canSee('messages')) { go('messages'); return; }
+  go('moncompte');
+  setTimeout(() => { const el = document.getElementById('msg-panel'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
+};
 
 /* ---------- Écran de bienvenue après connexion ---------- */
 function showWelcome() {

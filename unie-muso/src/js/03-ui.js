@@ -253,6 +253,15 @@ function renderLogin() {
     e.target.textContent = p.type === 'password' ? t('show') : t('hide');
   });
 }
+/* Bouton flottant « Mesaj » (bas à droite) : messages du comité, ou mes messages au comité */
+function msgFabHTML() {
+  if (!SESSION || STATE.page === 'messages') return '';
+  const me = SESSION.type === 'member' ? SESSION.code : null;
+  const comite = canSee('messages');
+  if (!comite && !me) return '';
+  const n = comite ? commPending() : memberUnread(me, 'replies');
+  return '<button class="msg-fab" data-act="msgFab" aria-label="Mesaj"><span class="ic" aria-hidden="true">✉</span>' + (currentLang() === 'kr' ? 'Mesaj' : 'Messages') + (n ? '<span class="badge-count">' + n + '</span>' : '') + '</button>';
+}
 function sidebarHTML() {
   const groups = [];
   PAGE_DEFS.forEach((p) => {
@@ -304,7 +313,7 @@ function render() {
         (typeof netStatusHTML === 'function' ? netStatusHTML() : '') +
         '<div class="lang-switch" role="group" aria-label="Langue">' + ['fr', 'kr'].map((l) => '<button class="' + (currentLang() === l ? 'on' : '') + '" data-act="setLang" data-id="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</div>' +
         '<div class="today">' + esc(longDate(today())) + '</div></header>' +
-        '<main class="content" id="content">' + html + '</main></div></div>';
+        '<main class="content" id="content">' + html + '</main></div>' + msgFabHTML() + '</div>';
   bindGlobal();
   tryShowNotifications(false);
 }

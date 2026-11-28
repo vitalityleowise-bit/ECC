@@ -469,7 +469,7 @@ PAGES.moncompte = function () {
   const s = memberStats(m.code);
   const aNoter = m.is_comite ? DB.demandes_pret.filter((d) => d.statut === 'En attente' && d.code_membre !== m.code) : [];
   const anc = monthsSince(m.date_adhesion);
-  return meetingBanner() + loanBanner(m.code) + profileTop(m, s, anc) +
+  return loanBanner(m.code) + profileTop(m, s, anc) +
         (aNoter.length ? panel('Demandes à évaluer (comité)', table(['N°', 'Membre', ['Demandé', 'n'], 'Ma note', ''], aNoter.map((d) => {
       const n = d.evaluation && d.evaluation.notes_comite ? d.evaluation.notes_comite[m.code] : undefined;
       return '<tr><td class="code">#' + d.id + '</td><td>' + esc(nameOf(d.code_membre)) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + (n === undefined ? '<span class="badge b-orange">à donner</span>' : '<b class="num">' + fmt(n) + '/' + GRILLE.pts_comite + '</b>') + '</td>' +
