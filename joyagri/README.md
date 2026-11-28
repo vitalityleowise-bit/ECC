@@ -1,5 +1,7 @@
 # JOYAGRI — Ventes, stock et comptabilité
 
+Apparence : 3 ambiances claires tirées du logo (Jardin, Soleil, Ciel), menu à gauche ou en haut — Paramètres → Apparence.
+
 Application hors ligne pour une entreprise à **deux activités suivies séparément partout** :
 
 1. **Services agricoles** : prestations sans stock, prix selon une unité propre à chaque service.

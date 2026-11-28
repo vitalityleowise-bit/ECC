@@ -450,12 +450,14 @@
     const demoSale = () => ({ no: J.nextSlipNo(), date: J.nowISO(), type: 'vente', status: 'valide', sellerName: A.user.name, client: { name: 'Client de passage' }, lines: [{ kind: 'product', name: 'Test d’impression — Vanille', unit: 'cornet', qty: 2, unitPrice: 5000, priceType: 'detail', gross: 10000, disc: 0, total: 10000 }], gross: 10000, totalDisc: 0, total: 10000, payments: [{ amount: 10000, mode: 'cash', atSale: true, date: J.nowISO() }] });
     const themeCard = h('div', { class: 'card' }, h('h2', null, 'Apparence — choisissez votre modèle'),
       h('p', { class: 'muted small' }, 'Touchez un modèle : il s’applique tout de suite sur cet appareil et sur les tickets / factures.'),
-      h('div', { class: 'themes' }, A.THEMES.map((t) => h('button', { class: 'tcard' + ((s.theme || 'ocean') === t.id ? ' on' : ''), 'data-theme': t.id, onclick: () => { s.theme = t.id; J.save(); U.toast(`Modèle « ${t.name} » appliqué.`, 'ok'); A.render(); } },
+      h('div', { class: 'themes three' }, A.THEMES.map((t) => h('button', { class: 'tcard' + ((s.theme || 'jardin') === t.id ? ' on' : ''), 'data-theme': t.id, onclick: () => { s.theme = t.id; J.save(); U.toast(`Modèle « ${t.name} » appliqué.`, 'ok'); A.render(); } },
         h('div', { class: 'mini' }, h('div', { class: 'mt' }, h('i'), h('b')),
-          t.id === 'royal' ? h('div', { class: 'mh' }, h('span', { class: 'on' }), h('span'), h('span'), h('span')) : null,
-          h('div', { class: 'mb' }, t.id === 'royal' ? null : h('div', { class: 'ms' }, h('span', { class: 'on' }), h('span'), h('span'), h('span'), h('span')),
+          s.menuTop ? h('div', { class: 'mh' }, h('span', { class: 'on' }), h('span'), h('span'), h('span')) : null,
+          h('div', { class: 'mb' }, s.menuTop ? null : h('div', { class: 'ms' }, h('span', { class: 'on' }), h('span'), h('span'), h('span'), h('span')),
             h('div', { class: 'mc' }, h('div'), h('div'), h('div', { class: 'cta' }), h('div'), h('div')))),
-        h('div', { class: 'tx' }, h('b', null, t.name, (s.theme || 'ocean') === t.id ? ' ✓' : ''), h('small', null, t.desc), h('div', { class: 'sw' }, t.sw.map((c) => h('i', { style: { background: c } }))))))));
+        h('div', { class: 'tx' }, h('b', null, t.name, (s.theme || 'jardin') === t.id ? ' ✓' : ''), h('small', null, t.desc), h('div', { class: 'sw' }, t.sw.map((c) => h('i', { style: { background: c } }))))))),
+      h('div', { class: 'row', style: { marginTop: '14px' } }, h('span', { class: 'small muted' }, 'Menu sur ordinateur :'),
+        U.seg([['side', 'À gauche'], ['top', 'En haut']], s.menuTop ? 'top' : 'side', (v) => { s.menuTop = v === 'top'; J.save(); A.render(); })));
     return h('div', null, A.title('Paramètres', h('button', { class: 'btn gold', onclick: save }, icon('save'), 'Enregistrer')),
       themeCard,
       h('div', { class: 'card' }, h('h2', null, 'Entreprise'), h('div', { class: 'row', style: { gap: '16px', alignItems: 'center', marginBottom: '12px' } }, logoImg,

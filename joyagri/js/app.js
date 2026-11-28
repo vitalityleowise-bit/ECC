@@ -46,18 +46,17 @@
   A.logo = () => J.db.settings.logo || J.LOGO;
 
   A.THEMES = [
-    { id: 'ocean', name: 'Océan', desc: 'Bleu marine, menu sombre à gauche', sw: ['#0B1B33', '#1D4ED8', '#3B82F6', '#F4F7FB'], meta: '#0B1B33' },
-    { id: 'azur', name: 'Azur', desc: 'Bleu ciel, tout en clair, arrondi', sw: ['#FFFFFF', '#0284C7', '#38BDF8', '#F0F9FF'], meta: '#FFFFFF' },
-    { id: 'nuit', name: 'Nuit', desc: 'Bleu nuit, mode sombre', sw: ['#0A1224', '#101B33', '#3B82F6', '#60A5FA'], meta: '#0A1224' },
-    { id: 'royal', name: 'Royal', desc: 'Bleu royal, menu en haut, style entreprise', sw: ['#172554', '#1E3A8A', '#4338CA', '#F5F6FA'], meta: '#172554' },
+    { id: 'jardin', name: 'Jardin', desc: 'Couleurs du logo, adoucies : vert frais, or miel, blanc', sw: ['#FFFFFF', '#F1F8EC', '#3F8F2E', '#F2B33D', '#8CC9E8'] },
+    { id: 'soleil', name: 'Soleil', desc: 'Jaune très pâle et chaleureux, touches de vert', sw: ['#FFFCF2', '#FFF1C7', '#F2B33D', '#3F8F2E', '#FFFFFF'] },
+    { id: 'ciel', name: 'Ciel', desc: 'Bleu pâle et blanc, aéré, boutons arrondis', sw: ['#F6FAFE', '#E3F0FA', '#8CC9E8', '#3F8F2E', '#F2B33D'] },
   ];
-  /** Applique le modèle choisi (couleurs + disposition du menu). */
+  /** Applique le modèle choisi (couleurs) et la position du menu. */
   A.applyTheme = (id) => {
     const t = A.THEMES.find((x) => x.id === id) || A.THEMES[0];
     document.documentElement.dataset.theme = t.id;
-    document.documentElement.dataset.layout = t.id === 'royal' ? 'top' : 'side';
+    document.documentElement.dataset.layout = J.db && J.db.settings.menuTop ? 'top' : 'side';
     const m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', t.meta);
+    if (m) m.setAttribute('content', '#FFFFFF');
   };
 
   A.render = () => {
@@ -93,6 +92,23 @@
   };
   A.title = (t, ...right) => h('div', { class: 'page-title' }, h('h1', null, t), right.length ? h('div', { class: 'row' }, right) : null);
 
+  /* ---------- Coque des pages d'accueil (connexion, installation) ---------- */
+  const leaf = (style, color) => h('div', { class: 'leaf', style, html: `<svg viewBox="0 0 120 120" width="100%" height="100%"><path d="M10 110 C 10 50, 50 10, 110 10 C 110 70, 70 110, 10 110 Z" fill="${color}"/><path d="M10 110 L 80 40" stroke="#fff" stroke-width="3" opacity=".7"/></svg>` });
+  A.authShell = (content, wide) => {
+    const s = J.db.settings;
+    const hero = h('section', { class: 'auth-hero' },
+      leaf({ width: '120px', height: '120px', left: '-20px', top: '40px', transform: 'rotate(-10deg)' }, 'rgba(109,179,63,.25)'),
+      leaf({ width: '90px', height: '90px', right: '6%', top: '12%', transform: 'rotate(80deg)' }, 'rgba(242,193,78,.35)'),
+      leaf({ width: '140px', height: '140px', right: '-30px', bottom: '8%', transform: 'rotate(160deg)' }, 'rgba(140,201,232,.35)'),
+      h('div', { class: 'ring' }, h('img', { src: A.logo(), alt: 'Logo ' + (s.name || '') })),
+      h('h1', null, brandName(s.name)),
+      s.slogan ? h('div', { class: 'slogan' }, s.slogan) : null,
+      h('div', { class: 'chips' }, h('span', null, icon('tractor'), 'Services agricoles'), h('span', null, icon('icecream'), 'Crème glacée'), h('span', null, icon('chart'), 'Comptabilité')),
+      h('div', { class: 'wave', html: '<svg viewBox="0 0 1440 120" preserveAspectRatio="none" width="100%" height="100%"><path d="M0 64 C 240 120 480 0 720 40 C 960 80 1200 120 1440 60 L1440 120 L0 120 Z" fill="var(--fond)"/></svg>' }));
+    return h('div', { class: 'auth' }, hero, h('section', { class: 'auth-panel' }, h('div', { class: 'auth-card' + (wide ? ' wide' : '') }, content)));
+  };
+  const greeting = () => { const hr = Number(new Intl.DateTimeFormat('fr', { timeZone: J.TZ, hour: 'numeric', hourCycle: 'h23' }).format(new Date())); return hr < 12 ? 'Bonjour' : hr < 18 ? 'Bon après-midi' : 'Bonsoir'; };
+
   /* ---------- Premier démarrage : aucun mot de passe par défaut ---------- */
   A.setup = () => {
     const s = J.db.settings;
@@ -117,17 +133,16 @@
       A.go('accueil');
     });
     const importBtn = h('button', { class: 'btn light block', onclick: () => A.importFile() }, icon('upload'), 'Restaurer une sauvegarde ou un profil');
-    return h('div', { class: 'login' }, h('div', { class: 'box', style: { maxWidth: '560px' } },
-      h('img', { class: 'logo', src: A.logo(), alt: 'Logo' }),
-      h('h1', null, brandName(s.name)), h('div', { class: 'slogan' }, s.slogan),
-      h('div', { class: 'card' }, h('h2', null, 'Installation — entreprise'),
+    return A.authShell([
+      h('div', { class: 'hello' }, 'Bienvenue 👋'), h('div', { class: 'sub' }, 'Installons votre espace en deux étapes.'),
+      h('div', { class: 'card' }, h('h2', null, '1. Votre entreprise'),
         h('div', { class: 'grid g2 stack' }, f.name, f.slogan, f.owner, f.phone), f.address,
         h('div', { class: 'grid g3 stack' }, f.nif, f.ninu, f.rc)),
-      h('div', { class: 'card' }, h('h2', null, 'Compte du propriétaire'),
-        h('p', { class: 'muted small' }, 'Aucun mot de passe n’est fourni d’avance : choisissez le vôtre. Le propriétaire pourra ensuite créer les comptes des vendeurs.'),
+      h('div', { class: 'card' }, h('h2', null, '2. Compte du propriétaire'),
+        h('p', { class: 'muted small' }, 'Aucun mot de passe n’est fourni d’avance : choisissez le vôtre. Vous créerez ensuite les comptes des vendeurs.'),
         h('div', { class: 'grid g2 stack' }, f.uname, f.login, f.pw, f.pw2),
-        h('button', { class: 'btn xl block', onclick: go }, icon('check'), 'Créer et commencer')),
-      h('div', { style: { marginTop: '12px' } }, importBtn)));
+        h('button', { class: 'btn gold xl block', onclick: go }, icon('check'), 'Créer et commencer')),
+      h('div', { style: { marginTop: '12px' } }, importBtn)], true);
   };
 
   /* ---------- Connexion ---------- */
@@ -163,15 +178,16 @@
     pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
     const s = J.db.settings;
     setTimeout(() => sel && pw.focus(), 50);
-    return h('div', { class: 'login' }, h('div', { class: 'box' },
-      h('img', { class: 'logo', src: A.logo(), alt: 'Logo' }),
-      h('h1', null, brandName(s.name)), h('div', { class: 'slogan' }, s.slogan),
-      h('div', { class: 'card' }, h('h2', null, 'Qui êtes-vous ?'), grid, pw, msg,
-        h('button', { class: 'btn xl block', onclick: go }, icon('lock'), 'Entrer')),
-      h('p', { class: 'muted small', style: { textAlign: 'center' } }, 'Mot de passe oublié ? Le propriétaire peut en donner un nouveau dans « Utilisateurs ».')));
+    const eye = h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Afficher le mot de passe', onclick: () => { pw.type = pw.type === 'password' ? 'text' : 'password'; } }, icon('eye'));
+    return A.authShell([
+      h('div', { class: 'hello' }, `${greeting()} !`),
+      h('div', { class: 'sub' }, new Intl.DateTimeFormat('fr-FR', { timeZone: J.TZ, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())),
+      h('div', { class: 'card' }, h('h2', null, 'Qui êtes-vous ?'), grid, h('div', { class: 'pwbox' }, pw, eye), msg,
+        h('button', { class: 'btn gold xl block', onclick: go }, icon('lock'), 'Se connecter')),
+      h('p', { class: 'foot' }, 'Mot de passe oublié ? Le propriétaire peut en donner un nouveau dans « Utilisateurs ».', h('br'), `${s.name} · ${s.slogan || ''}`)]);
   };
   A.setUser = (u) => { A.user = u; try { sessionStorage.setItem('joyagri:user', u.id); } catch (e) { /* rien */ } };
-  A.logout = () => { J.saveNow(); A.user = null; try { sessionStorage.removeItem('joyagri:user'); } catch (e) { /* rien */ } location.hash = '#/accueil'; A.render(); };
+  A.logout = () => { document.querySelectorAll('.toast').forEach((t) => t.remove()); J.saveNow(); A.user = null; try { sessionStorage.removeItem('joyagri:user'); } catch (e) { /* rien */ } location.hash = '#/accueil'; A.render(); };
 
   /* ---------- Panneau « Plus » : toutes les fonctions en tuiles (téléphone) ---------- */
   const tiles = (onPick) => {

@@ -264,9 +264,9 @@
       x.fillStyle = '#fff'; x.fillRect(0, 0, W, L.h);
       const cs = getComputedStyle(document.documentElement);
       const pc = (cs.getPropertyValue('--p') || '#1D4ED8').trim(); const p2 = (cs.getPropertyValue('--p2') || '#1E40AF').trim();
-      const dark = document.documentElement.dataset.theme === 'nuit';
-      const ink = dark ? '#1E3A8A' : pc;
-      x.fillStyle = ink; x.fillRect(0, 0, W, 8); x.fillStyle = dark ? '#3B82F6' : p2; x.fillRect(0, L.h - 8, W, 8);
+      const ink = p2 || pc;
+      const grd = x.createLinearGradient(0, 0, W, 0); grd.addColorStop(0, '#6DB33F'); grd.addColorStop(0.5, '#F2C14E'); grd.addColorStop(1, '#8CC9E8');
+      x.fillStyle = grd; x.fillRect(0, 0, W, 8); x.fillRect(0, L.h - 8, W, 8);
       L.ops.forEach((o) => {
         if (o.k === 'logo') { if (img) x.drawImage(img, (W - 140) / 2, o.y, 140, 140); return; }
         if (o.k === 'hr') { x.strokeStyle = '#CBD5E1'; x.setLineDash([6, 5]); x.beginPath(); x.moveTo(pad, o.y); x.lineTo(W - pad, o.y); x.stroke(); x.setLineDash([]); return; }
