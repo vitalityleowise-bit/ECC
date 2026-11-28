@@ -1,0 +1,2 @@
+Firebase JavaScript SDK 10.14.1 (compat builds) — Apache License 2.0 — https://github.com/firebase/firebase-js-sdk
+Copié depuis le paquet npm « firebase » : firebase-app-compat.js, firebase-auth-compat.js, firebase-firestore-compat.js.

@@ -1,0 +1,144 @@
+UNIE-MUSO — Demandes à réaliser (notées le 26/11/2026)
+====================================================
+
+Statut : EN ATTENTE. Le trésorier relit l'application et enverra d'autres corrections
+avant le début de ces travaux. Ne contient aucune donnée personnelle de membre.
+
+A. VERSION EN LIGNE AVEC SYNCHRONISATION AUTOMATIQUE (choisie)
+   - Données sur un serveur sécurisé (Firebase ou Supabase, formule gratuite).
+   - L'application continue de fonctionner hors ligne ; dès qu'Internet revient,
+     tout se synchronise automatiquement (téléphone Android, PC, iPhone).
+   - Vrais comptes sécurisés (admin, caissier, membres, comité) et règles d'accès
+     côté serveur (un membre ne voit que ses données + le rapport mensuel).
+   - Le trésorier crée lui-même le compte du service, avec un guide pas à pas.
+
+B. MESSAGERIE INTERNE + NOTIFICATIONS
+   1. Remercier un membre pour sa cotisation (après l'enregistrement).
+   2. Indiquer à un membre le montant à verser à la prochaine réunion
+      (cotisation du mois, retard, amendes, mensualité de prêt).
+   3. Rappeler l'heure et la date de la réunion.
+   4. Rappeler à un membre qu'il n'a pas payé ses dernières cotisations.
+   5. Après une demande de prêt : message automatique « votre demande est reçue,
+      le comité va l'étudier ».
+   6. Souhaiter l'anniversaire d'un membre avec un beau message (date de naissance
+      de la fiche membre).
+   7. Messages envoyés à un membre, à plusieurs membres ou à tous.
+
+C. RÉUNIONS PROGRAMMÉES
+   1. Pouvoir programmer une réunion à une autre date que le dernier jeudi du mois
+      (date, heure, lieu, ordre du jour).
+   2. Réunions du comité : c'est la PRÉSIDENTE qui les programme depuis son compte
+      (date, heure, lieu, objet).
+   3. Chaque personne convoquée reçoit une notification et CONFIRME sa participation
+      (présent / absent / excusé).
+   4. Relances automatiques, plusieurs fois, tant que la personne n'a pas répondu.
+   5. La présidente voit qui a confirmé, qui a refusé, qui n'a pas répondu.
+
+D. iPHONE
+   - Pas d'APK possible sur iPhone. Solution : la version en ligne (A), ouverte dans
+     Safari puis « Ajouter à l'écran d'accueil » (icône comme une application).
+   - Notifications sur iPhone : iOS 16.4 ou plus récent, application ajoutée à
+     l'écran d'accueil.
+
+E. À NOTER
+   - Les messages entre téléphones et les relances automatiques ont besoin du
+     serveur de la version en ligne (A) : ils seront faits ensemble.
+   - En complément possible : bouton « Envoyer par WhatsApp » qui prépare le message
+     (remerciement, rappel, montant dû) pour le membre concerné.
+
+F. RETOURS APRÈS INSTALLATION (26/11/2026)
+   1. Windows affiche « éditeur inconnu » au lancement (l'application fonctionne).
+      Cause : UNIE-MUSO.exe n'est pas signé numériquement. Reconstruire le fichier
+      ne change rien ; il faut une signature de code :
+        - certificat de signature de code (payant, environ 100 à 400 USD/an), ou
+        - publication sur le Microsoft Store (le Store signe l'application).
+      En attendant : « Informations complémentaires » > « Exécuter quand même ».
+   2. Android : un fichier de sauvegarde .unimiso s'ouvre directement dans
+      l'application seulement quand on le touche depuis WhatsApp.
+      À corriger : l'ouverture doit aussi marcher depuis l'application Fichiers,
+      Gmail, Bluetooth, Google Drive, etc. (filtre d'ouverture Android plus large
+      + vérification du contenu avant import).
+
+G. DÉCISIONS VALIDÉES
+   1. Tous les membres de la mutuelle voient le résumé du rapport mensuel
+      (pas seulement le comité). FAIT en version 3.2 : affiché dans « Mon compte »,
+      avec choix du mois, plein écran et lien vers le rapport complet.
+      À garder dans la version en ligne (A).
+   2. Tout l'argent de la mutuelle est à la Banque CAP-AIDER (mode par défaut).
+   3. Un membre du comité ne note ni ne décide sa propre demande de crédit.
+   4. Le résumé du rapport est un texte rédigé (actif, passif, capitaux, produits,
+      charges, crédit, points d'attention), modifiable par le trésorier.
+
+H. FICHE DE DÉPÔT ENVOYÉE PAR LE MEMBRE (validation MANUELLE par le trésorier)
+   Règlement chap. II art. 4 : le membre garde sa fiche de dépôt et la remet au trésorier.
+   1. Dans « Mon compte », le membre touche « Envoyer une fiche de dépôt » : il prend la
+      PHOTO de sa fiche CAP-AIDER (ou la choisit dans la galerie), avec une note libre
+      facultative (ex. « cotisation + mensualité de prêt »). Un seul montant peut couvrir
+      plusieurs choses : AUCUNE répartition automatique.
+   2. Le trésorier reçoit une notification et voit la photo.
+   3. C'est le TRÉSORIER qui enregistre lui-même la cotisation / le remboursement / l'amende
+      dans les listes habituelles, puis marque la fiche comme « traitée » (ou « refusée »
+      avec un motif). La photo peut être jointe comme pièce justificative.
+   4. Le membre voit l'état de ses fiches : envoyée, traitée, refusée.
+   Dépend de la version en ligne (A) pour que la fiche arrive chez le trésorier.
+
+I. DEMANDES DU 27/11/2026
+   FAIT (version 3.3) :
+   - Amende de cotisation ajoutée pour chaque mois non payé à temps (détail des mois affiché).
+   - Exercice de la mutuelle : 1er avril → 31 mars.
+   - Onglet « Réunions et quorum » : quorum = 50 % + 1 des membres actifs (18 → 10),
+     lien vers la liste de présence, décision manuelle possible, réunions programmées.
+   - Sans quorum (ou sans réunion) : la réunion ne compte pas (ni retard, ni absence)
+     et les opérations passent au rapport du mois suivant (ex. juillet → août).
+   - Un membre peut cotiser sans être présent : la feuille de présence fait foi.
+   - Nouvelle police (Plus Jakarta Sans), embarquée hors ligne.
+   - Caisse Bleue (dons, subventions).
+   - Suppression d'une demande de prêt.
+   - Note de 0 à 50 : aucun montant maximum.
+   - Dépenses : bénéficiaire choisi dans la liste des membres, filtre et saisie par mois ;
+     Statistiques : dépenses par mois.
+   - Caisse à zéro (tout l'argent à la banque).
+   - Deux personnes seulement modifient : le trésorier (admin) et un membre du comité
+     choisi dans Paramètres (Présidente par défaut). Compte « caissier » supprimé.
+   - Un membre qui a un prêt en cours ne peut pas faire de nouvelle demande.
+   - Les membres hors comité voient seulement le résumé du rapport (Mon compte).
+   - Messagerie membres ↔ comité (qui a envoyé, qui a répondu) et boîte à suggestions.
+   - Écran de bienvenue avec le logo après la connexion.
+   EN ATTENTE DU FICHIER EXCEL DU TRÉSORIER :
+   - Plan comptable de la mutuelle (les comptes de produits ne doivent pas être en capital),
+     ordre des comptes dans tous les états financiers, compte de la Caisse Bleue.
+
+J. DEMANDES DU 27/11/2026 (2e partie) — FAIT en version 3.4 (HTML à tester)
+   - Données reprises de la dernière sauvegarde du trésorier (fichier privé, hors Git).
+   - Réunion programmée : fichier d'ordre du jour (photo ou PDF), visible des membres
+     dans « Mon compte » (réunions du comité visibles seulement du comité).
+   - Dépense : l'argent sort de la caisse après un retrait à CAP-AIDER (écriture de retrait
+     automatique le même jour, la caisse reste à zéro) ; option « payé directement par la banque ».
+   - Langue FR / KR propre à chaque personne (bouton en haut de l'écran et à la connexion).
+   - Écran de bienvenue : reste affiché jusqu'au bouton « Entrer ».
+   - Menu : « Comptabilité » se déroule (Plan comptable, Journal, Balance, Bilan, État résultats).
+   - Plan comptable complet (classes 1 à 5) ; produits et charges jamais en capital ;
+     balance et bilan classés par classe avec sous-totaux.
+   - Caisse Bleue retirée : « Dons et subventions », reçus (4060) ou accordés (5050).
+   NOTE : traduction KR limitée aux menus et éléments principaux ; le reste reste en français.
+
+K. CLASSEUR EXCEL DU TRÉSORIER (UNIE_MUSO_SEPTEMBRE.xlsx) — FAIT
+   - Plan comptable du trésorier repris tel quel : 1 Trésorerie, 2 Créances, 3 Passif
+     (3010 Caisse Verte), 4 Liaison, 5 Capitaux propres (5020 Caisse Rouge, 5040 Surplus),
+     7 Produits, 6 Charges (+ 6050 Réunion du comité ; ajout 6060 Dons accordés).
+   - Balance, Bilan et État des résultats au format des feuilles du classeur.
+   - Données manquantes ajoutées (fichier privé) : frais d'inscription, dépenses
+     d'avril, mai, septembre et octobre, capital social CAP-AIDER, vente de livret.
+   - Contrôle au 29/10/2026 : chaque compte identique à la feuille BALANCE_VERIFICATION
+     (totaux 265 450 / 265 450) ; bilan 241 900 ; état des résultats d'octobre identique
+     (2 831 − 3 500 = −669).
+   - À faire par le trésorier : préciser le motif des anciennes amendes (cotisation ou
+     retard/absence) et le détail des dépenses reprises du classeur.
+
+L. NOTIFICATIONS (27/11/2026) — FAIT en version 3.6.3
+   - Notification sur le téléphone et le PC dès qu'arrive : une annonce (tous les membres),
+     un message / une suggestion / une demande de prêt (comité), une réponse du comité ou
+     la décision sur une demande de prêt (le membre concerné).
+   - Fonctionne quand l'application est ouverte ou en arrière-plan. Sur PC, UNIE-MUSO reste
+     actif près de l'horloge. Application complètement fermée sur le téléphone : pas de
+     notification (demanderait Firebase Cloud Messaging + Cloud Functions, formule Blaze).

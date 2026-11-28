@@ -1,0 +1,59 @@
+rules_version = '2';
+// Règles de sécurité UNIE-MUSO — à coller dans Firebase : Firestore Database > Règles > Publier.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    // Le trésorier : compte « admin » de l'application
+    function isAdmin() { return signedIn() && request.auth.token.email == 'admin@uniemuso.app'; }
+    function roleDoc() { return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data; }
+    function hasRole() { return signedIn() && exists(/databases/$(database)/documents/roles/$(request.auth.uid)); }
+    // Membre de la mutuelle reconnu (un compte créé par le trésorier)
+    function isMember() { return isAdmin() || hasRole(); }
+    function myCode() { return roleDoc().code; }
+    // Deux personnes peuvent modifier : le trésorier et le membre du comité choisi
+    function isEditor() { return isAdmin() || (hasRole() && roleDoc().role == 'editeur'); }
+    function isComite() { return isEditor() || (hasRole() && roleDoc().role == 'comite'); }
+
+    // Rôles : écrits seulement par le trésorier ; chacun lit le sien
+    match /roles/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow write: if isAdmin();
+    }
+    // Données de gestion (membres, cotisations, prêts, comptabilité…) : lues par les membres, modifiées par les 2 éditeurs
+    match /db/{part} {
+      allow read: if isMember();
+      allow write: if isEditor();
+    }
+    // Messages au comité : le membre voit les siens ; le comité voit et répond à tout
+    match /messages/{id} {
+      allow read: if isComite() || (isMember() && resource.data.from_code == myCode());
+      allow create: if isMember() && (isComite() || request.resource.data.from_code == myCode());
+      allow update: if isComite() || (isMember() && resource.data.from_code == myCode());
+      allow delete: if isEditor();
+    }
+    // Suggestions : le membre envoie et voit les siennes ; le comité voit et répond
+    match /suggestions/{id} {
+      allow read: if isComite() || (isMember() && resource.data.from_code == myCode());
+      allow create: if isMember();
+      allow update, delete: if isComite();
+    }
+    // Annonces : publiées par le comité, lues par tous les membres (chacun peut marquer « lu »)
+    match /annonces/{id} {
+      allow read: if isMember();
+      allow create, delete: if isComite();
+      allow update: if isComite() || (isMember() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']));
+    }
+    // Demandes de prêt : le membre dépose la sienne ; le comité note ; les éditeurs décident
+    match /demandes/{id} {
+      allow read: if isComite() || (isMember() && resource.data.code_membre == myCode());
+      allow create: if isComite() || (isMember() && request.resource.data.code_membre == myCode());
+      allow update: if isComite();
+      allow delete: if isEditor();
+    }
+    // Préférences personnelles (langue)
+    match /prefs/{code} {
+      allow read, write: if isMember() && (isEditor() || code == myCode());
+    }
+  }
+}

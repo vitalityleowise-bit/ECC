@@ -1,0 +1,181 @@
+UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
+=====================================================================================
+Version actuelle : 3.8.2 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+
+COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
+------------------------------------------------
+1. Ouvrir une nouvelle session Claude Code sur le dépôt GitHub (branche ci-dessous).
+2. Écrire : « Lis unie-muso/REPRENDRE.txt et unie-muso/CAHIER-DES-CHARGES.txt, puis continue. »
+3. Envoyer aussi (ces fichiers ne sont PAS sur GitHub, ils sont privés) :
+   - la DERNIÈRE sauvegarde complète (.unimiso) exportée depuis l'application ;
+   - UNIE-MUSO-cle-APK.zip (clé de signature Android + mot de passe) — sans elle, le
+     nouvel APK ne pourra pas remplacer l'ancien sur les téléphones (il faudrait
+     désinstaller, donc exporter les données avant) ;
+   - le bloc de configuration Firebase (Console Firebase > Paramètres du projet >
+     Vos applications > Configuration) — la clé « apiKey » n'est pas un mot de passe.
+4. Dire en une phrase ce qu'il faut changer. Le cahier des charges contient la liste
+   de ce qui est fait et de ce qui reste.
+
+DÉPÔT
+-----
+- Dépôt : vitalityleowise-bit/ECC — dossier unie-muso/
+- Branche de travail : ccr-a6101d9b-7z0lv4
+- Le dépôt est PUBLIC : ne jamais y mettre de noms de membres, de montants réels,
+  de sauvegardes, la configuration Firebase ni la clé Android.
+  Contrôle avant chaque commit :
+    git grep -i "AIzaSy" -- unie-muso      (doit ne rien afficher)
+  + vérifier qu'aucun nom de membre n'apparaît dans les fichiers modifiés.
+
+ORGANISATION DES FICHIERS
+-------------------------
+src/index.html          gabarit (emplacements __FONTS__ __CSS__ __LOGO__ __VENDOR__ __JS__)
+src/styles.css          styles (marine #1A3A6B, orange #E8650A, vert #2E7D32, rouge #C62828)
+src/js/00-docs-data.js  textes des statuts et du règlement intérieur
+src/js/01-core.js       données, règles par défaut (amendes, exercice 1er avril), réglages
+src/js/02-calc.js       calculs : présences, quorum, cotisations, prêts, grille de crédit,
+                        plan comptable, journal, balance / bilan / résultats (financials)
+src/js/03-ui.js         langues FR/KR, menus (PAGE_DEFS + rôles), connexion, impression
+src/js/04-backup.js     export / import, dossier natif Documents/UNIE-MUSO
+src/js/05..08-*.js      pages (tableau de bord, membres, cotisations, prêts, dépenses,
+                        comptabilité, rapport mensuel + résumé, espace membre, réunions,
+                        dons, messagerie, suggestions, annonces, paramètres)
+src/js/06b-credit.js    demandes de prêt et grille de notation
+src/js/09-online.js     version en ligne (Firebase Auth + Firestore, synchro automatique)
+src/js/99-boot.js       démarrage
+src/private/            PRIVÉ, ignoré par Git : seed.json (données du trésorier),
+                        rules.json, settings.json, firebase.json, keystore-pass.txt
+firebase/firestore.rules  règles de sécurité (déjà publiées par le trésorier)
+vendor/firebase/        SDK Firebase compat 10.14.1 embarqué (hors ligne)
+assets/                 logo, icônes, police Plus Jakarta Sans
+electron/               application Windows (Electron 33)
+android/                application Android (WebView + pont natif « UnieNative »)
+windows/                INSTALLER.bat, DESINSTALLER.bat, LISEZ-MOI.txt
+dist/, release/         fichiers produits (ignorés par Git)
+
+Si src/private/ est absent (nouvelle machine) :
+- seed.json : se refait à partir de la dernière sauvegarde .unimiso (partie « data ») ;
+  sans lui, l'application démarre avec des données de démonstration.
+- firebase.json : { "apiKey": ..., "authDomain": ..., "projectId": ..., "storageBucket": ...,
+  "messagingSenderId": ..., "appId": ... } copié de la console Firebase.
+- rules.json / settings.json : facultatifs (règles et réglages aussi dans la sauvegarde).
+
+CONSTRUIRE
+----------
+HTML (un seul fichier autonome, ~1,1 Mo) :
+    cd unie-muso && node build.js            -> dist/UNIE-MUSO.html
+
+APK Android (SDK : platform 34, build-tools 34 ; Gradle 8.14 ; JDK 17) :
+    cp dist/UNIE-MUSO.html android/app/src/main/assets/
+    cd android
+    (mettre uniemuso.keystore dans android/ et le mot de passe dans src/private/keystore-pass.txt)
+    export UNIE_KEYSTORE=$PWD/uniemuso.keystore UNIE_KEYSTORE_PASS=$(cat ../src/private/keystore-pass.txt)
+    gradle --no-daemon assembleRelease       -> app/build/outputs/apk/release/app-release.apk
+    Avant chaque nouvel APK : augmenter versionCode / versionName dans android/app/build.gradle.
+    (Installer le SDK demande l'accès réseau à dl.google.com.)
+
+Windows :
+    cp dist/UNIE-MUSO.html electron/app/
+    cd electron && npm install && npx electron-builder --win dir --x64 && node set-icon.js
+    Puis : release/win/UNIE-MUSO/ = contenu de electron/release/win-unpacked + DESINSTALLER.bat,
+    à côté : INSTALLER.bat + LISEZ-MOI.txt, le tout zippé en UNIE-MUSO-Windows.zip.
+    Version à changer dans : electron/package.json, electron/set-icon.js, windows/INSTALLER.bat.
+    (L'installateur NSIS ne se construit pas ici : Wine plante. D'où INSTALLER.bat.)
+
+TESTS
+-----
+- Les tests automatiques (Playwright) mettent window.UNIE_NO_ONLINE = true : ils ne
+  touchent JAMAIS le vrai projet Firebase.
+- La synchro en ligne se teste avec l'émulateur Firebase (window.UNIE_EMULATOR,
+  projet « demo-… », ports 9099 et 8080). Ne jamais créer de comptes dans le vrai projet.
+
+POINTS TECHNIQUES IMPORTANTS
+----------------------------
+- Stockage : localStorage (clés uniemuso-*) + copie native dans Documents/UNIE-MUSO
+  (téléphone et PC). Si le stockage du navigateur est vide, restoreFromNative() recharge
+  le fichier natif.
+- Depuis la 3.6 : l'APK sert la page sur https://appassets.androidplatform.net/assets/
+  et Windows sur app://unie-muso/ (adresses sécurisées exigées par Firebase).
+  Au premier lancement de la 3.6, les données reviennent du dossier Documents/UNIE-MUSO.
+- APK 3.6.1 : ajout de la permission INTERNET (absente avant : le téléphone affichait
+  « Connexion Internet instable »). Nouvel essai en ligne toutes les 20 s et au retour
+  dans l'application ; le code d'erreur Firebase est affiché dans le message.
+- 3.6.3 : notifications système (téléphone, PC) pour ce qui arrive du serveur
+  (notifyRemoteChanges dans 09-online.js) : annonce -> tous ; message, suggestion,
+  demande de prêt -> comité ; réponse, décision de prêt -> le membre concerné.
+  Jamais pour ses propres écrits, ni pour l'historique sur un appareil neuf.
+  Limite : l'application doit être ouverte ou en arrière-plan (sur PC elle reste
+  dans la zone de notification). Application fermée sur le téléphone = pas de
+  notification : il faudrait Firebase Cloud Messaging + Cloud Functions (formule Blaze).
+- 3.6.4 : envoi plus rapide depuis le PC. pushAll envoie d'abord messages / annonces /
+  demandes (pushCollab) puis les grandes listes (pushShared) ; un envoi demandé pendant un
+  autre n'est plus perdu (ONLINE.pushAgain). Au retour au premier plan après plus de 20 s,
+  la connexion Firestore est rouverte (disableNetwork puis enableNetwork).
+- 3.7.0 (service Android de notifications application fermée, sans carte) a été RETIRÉE
+  à la demande du trésorier : la 3.7.1 reprend exactement la 3.6.4 (numéro plus haut pour
+  que les téléphones l'acceptent en mise à jour). Le code de la 3.7.0 reste dans l'historique
+  Git (commit « notifications with the app closed… »). Le trésorier cherche une carte pour
+  la formule Blaze (notifications instantanées par Firebase Cloud Messaging).
+- 3.7.2 : mots de passe des comptes en ligne. Firebase exige l'ANCIEN mot de passe pour en poser
+  un nouveau : l'appareil du trésorier garde (localement, uniemuso-sync-v1 : pwds / oldPwds) le mot
+  de passe posé sur chaque compte et les anciens ; signInMemberAccount essaie le nouveau, puis
+  ceux-là, puis le code du membre, et remplace. Changement par la fiche membre aussi pris en compte.
+  Si rien ne marche : supprimer l'utilisateur dans Firebase > Authentication puis recréer.
+  Connexion d'un membre : si Firebase accepte le mot de passe, il devient le mot de passe local.
+  « Dernière connexion des membres » (Paramètres > En ligne) : prefs/{code}.last_seen + app.
+  fmtDT affiche maintenant l'heure LOCALE (avant : UTC, 5 h d'avance en Haïti).
+- 3.7.3 : le trésorier peut travailler depuis son téléphone. Le mot de passe « admin » est propre à
+  chaque appareil (USERS, non synchronisé) ; si Firebase accepte le mot de passe saisi, il devient
+  celui de l'appareil. Conflits : un envoi remplace la liste entière (la modification la plus
+  récente gagne) -> travailler sur un appareil à la fois, attendre « tout est synchronisé ».
+- 3.7.5 : auth/too-many-requests (Firebase bloque l'appareil, et toute la connexion partagée).
+  goOnline ne réessaie plus seul après un mot de passe refusé (ONLINE.badPwd, remis à zéro à la
+  déconnexion), attend 30 min après un blocage (ONLINE.blockedUntil), réessaie 20 s seulement pour
+  un problème réseau. Mise à jour des comptes : 3 anciens mots de passe max, 0,7 s entre essais,
+  arrêt immédiat si Firebase bloque.
+- 3.7.6 : changement de mot de passe sans manipulation. Côté trésorier : file st.pendingPwd,
+  traitée immédiatement si en ligne, sinon automatiquement au retour en ligne (processPendingPwds).
+  Côté membre : mot de passe refusé -> fenêtre « Nouveau mot de passe » (askNewPassword, 3 essais
+  max), sans déconnexion ; aussi en touchant « ! Problème en ligne ».
+- 3.8.0/3.8.1 : nouveau design (carte de membre pastel bleu/rouge, menu flottant bleu pâle,
+  bouton « Messages », accueil bleu pâle, Paramètres > Présentation de Mon profil).
+  MOTS DE PASSE (refonte 3.8.1) : un compte Firebase PAR mot de passe de membre :
+  <code>-<sha256(UNIE-MUSO|CODE|mdp) 12 hex>@uniemuso.app (memberEmail). Plus jamais besoin de
+  l'ancien mot de passe ; ensureMemberAccount crée le compte, pose le rôle, retire le rôle de l'ancien
+  compte. Aucun mot de passe par défaut ; build.js vide portal_password du fichier installé ;
+  bouton « Effacer tous les mots de passe des membres » (Accès portail). Membre sans rôle
+  (permission-denied) -> fenêtre « Mot de passe » (accessRemoved). Admin : admin@uniemuso.app inchangé.
+- 3.8.2 : appareil jamais synchronisé -> il REÇOIT d'abord le serveur (get de « db » avant pushAll ;
+  onRemoteDb : le serveur gagne pour une liste jamais reçue). Mot de passe admin différent du compte
+  en ligne (email-already-in-use) -> fenêtre « Mot de passe » qui l'aligne. APP_VERSION à jour.
+- Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
+  Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
+- En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer
+  en ligne tant que le mot de passe admin est « admin ». Données partagées en morceaux
+  dans la collection « db » ; messages, suggestions, annonces, demandes : un document chacun.
+- Comptabilité : plan comptable du trésorier (classes 1, 2, 3, 4, 5, 7, 6). Contrôlé
+  identique au classeur Excel au 29/10/2026 (balance 265 450 / 265 450, bilan 241 900).
+- Interface : toujours « membre » (jamais « sociétaire »), police 13 px, pas d'emoji
+  (sauf 📥 sur la bannière d'import), pas de fond crème ni de terracotta.
+
+RESTE À FAIRE (détail dans CAHIER-DES-CHARGES.txt)
+--------------------------------------------------
+- Messagerie automatique : remerciement, montant dû, rappels de réunion et d'impayés,
+  accusé de demande de prêt, anniversaires (section B).
+- Convocations avec confirmation et relances répétées (section C).
+- Fiche de dépôt photographiée par le membre, enregistrée à la main par le trésorier (H).
+- Lien iPhone : héberger une version sans données (Safari > écran d'accueil) (D).
+- Masquer les mots de passe des membres aux autres membres en version en ligne.
+- Android : ouvrir directement un ordre du jour PDF.
+- Traduction kreyòl complète (aujourd'hui : menus et éléments principaux).
+- Signature de code Windows (« éditeur inconnu ») : certificat payant ou Microsoft Store.
+- Questions en attente pour le trésorier : effacer l'historique Git qui contient encore
+  d'anciens noms ; fin d'exercice le 31 mars (retenu) ou le 30 mars.
+- À faire par le trésorier : motif des anciennes amendes, détail des dépenses reprises,
+  étapes 3 à 6 de GUIDE-EN-LIGNE.txt (mot de passe admin, mots de passe membres,
+  passage en ligne, création des comptes).
+
+AUTRES GUIDES
+-------------
+CAHIER-DES-CHARGES.txt   demandes faites / à faire (sections A à K)
+GUIDE-FIREBASE.txt       création du projet Firebase
+GUIDE-EN-LIGNE.txt       mise en ligne pas à pas
