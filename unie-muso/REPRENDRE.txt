@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.7.6 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.8.1 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -136,6 +136,14 @@ POINTS TECHNIQUES IMPORTANTS
   traitée immédiatement si en ligne, sinon automatiquement au retour en ligne (processPendingPwds).
   Côté membre : mot de passe refusé -> fenêtre « Nouveau mot de passe » (askNewPassword, 3 essais
   max), sans déconnexion ; aussi en touchant « ! Problème en ligne ».
+- 3.8.0/3.8.1 : nouveau design (carte de membre pastel bleu/rouge, menu flottant bleu pâle,
+  bouton « Messages », accueil bleu pâle, Paramètres > Présentation de Mon profil).
+  MOTS DE PASSE (refonte 3.8.1) : un compte Firebase PAR mot de passe de membre :
+  <code>-<sha256(UNIE-MUSO|CODE|mdp) 12 hex>@uniemuso.app (memberEmail). Plus jamais besoin de
+  l'ancien mot de passe ; ensureMemberAccount crée le compte, pose le rôle, retire le rôle de l'ancien
+  compte. Aucun mot de passe par défaut ; build.js vide portal_password du fichier installé ;
+  bouton « Effacer tous les mots de passe des membres » (Accès portail). Membre sans rôle
+  (permission-denied) -> fenêtre « Mot de passe » (accessRemoved). Admin : admin@uniemuso.app inchangé.
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer

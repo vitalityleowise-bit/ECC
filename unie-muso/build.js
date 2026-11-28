@@ -18,6 +18,8 @@ const seedPath = path.join(src, 'private', 'seed.json');
 function readPrivate(name) { const f = path.join(src, 'private', name); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; }
 const privateSeed = fs.existsSync(seedPath) ? JSON.parse(fs.readFileSync(seedPath, 'utf8')) : null;
 if (!privateSeed) console.warn('Attention : src/private/seed.json absent — build sans données de membres.');
+// Jamais de mot de passe de membre dans le fichier installé : seul le trésorier les donne (et en ligne)
+if (privateSeed) { const d = privateSeed.data || privateSeed; (d.members || []).forEach((m) => { m.portal_password = ''; delete m.uid; }); }
 
 const js = ['/* UNIE-MUSO — application autonome hors ligne */', 'const EMBEDDED_LOGO = ' + JSON.stringify(logo) + ';',
   'const PRIVATE_SEED = ' + JSON.stringify(privateSeed) + ';',

@@ -17,7 +17,7 @@ const KEYS = {
 function seedMember(code, nom, prenom, extra) {
   return Object.assign({
     code, nom, prenom, nif: '', date_adhesion: '', telephone: '', adresse: '', email: '',
-    statut: 'Actif', photo: '', portal_password: code.toLowerCase(), can_see_documents: true,
+    statut: 'Actif', photo: '', portal_password: '', can_see_documents: true,
     is_comite: false, comite_poste: '', comite_see_demandes: true, comite_see_compta: true,
     comite_see_reports: true, date_naissance: '', profession: '',
   }, extra || {});

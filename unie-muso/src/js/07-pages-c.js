@@ -602,7 +602,8 @@ PAGES.parametres = function () {
       '<td class="c"><input type="checkbox" data-change="perm" data-id="' + m.code + ':is_comite"' + (m.is_comite ? ' checked' : '') + '></td>' +
       '<td>' + (m.is_comite ? '<input value="' + esc(m.comite_poste || '') + '" data-change="poste" data-id="' + m.code + '" list="postes" style="width:130px;padding:3px 6px;border:1px solid var(--line);border-radius:4px">' : '') + '</td>' +
       ['comite_see_demandes', 'comite_see_compta', 'comite_see_reports'].map((k) => '<td class="c">' + (m.is_comite ? '<input type="checkbox" data-change="perm" data-id="' + m.code + ':' + k + '"' + (m[k] ? ' checked' : '') + '>' : '') + '</td>').join('') + '</tr>');
-    body = '<section class="panel"><div class="toolbar"><button class="btn btn-sm" data-act="defaultPwds">Générer des mots de passe par défaut</button><span class="muted">Code en minuscules (ex. m001) pour les membres sans mot de passe.</span></div>' +
+    body = '<section class="panel"><div class="toolbar"><button class="btn btn-sm btn-danger" data-act="clearPwds">Effacer tous les mots de passe des membres</button>' +
+      '<span class="muted">Vous seul donnez le mot de passe de chaque membre (bouton « Définir »). Le compte en ligne est prêt tout seul ; un ancien mot de passe ne marche plus.</span></div>' +
       '<datalist id="postes">' + ['Présidente', 'Président', 'Vice-président(e)', 'Secrétaire', 'Secrétaire adjoint(e)', 'Trésorier', 'Contrôleur', 'Responsable crédit', 'Responsable cotisation'].map((p) => '<option value="' + p + '">').join('') + '</datalist>' +
       table(['Code', 'Membre', 'Mot de passe', ['Docs', 'c'], ['Comité', 'c'], 'Poste', ['Demandes', 'c'], ['Compta.', 'c'], ['Rapport', 'c']], rows) +
       '<div class="section-note">Tous les membres du comité peuvent noter les demandes de prêt depuis « Mon compte ». Les cases Demandes / Compta. / Rapport ouvrent les pages correspondantes.</div></section>';
@@ -652,17 +653,20 @@ ACTIONS.perm = (key, el) => {
 ACTIONS.poste = (code, el) => { getMember(code).comite_poste = el.value.trim(); saveDB(); toast('Poste enregistré.', 'ok'); };
 ACTIONS.setPwd = (code) => openModal({
   title: 'Mot de passe — ' + code + ' ' + nameOf(code), submit: t('save'),
-  body: field('Nouveau mot de passe', input('pwd', getMember(code).portal_password || '', 'autocapitalize="off" autocorrect="off"'), '', 'Laisser vide pour bloquer l’accès au portail.'),
+  body: field('Mot de passe', input('pwd', getMember(code).portal_password || '', 'autocapitalize="off" autocorrect="off" autocomplete="off"'), '', 'Visible ici pour que vous puissiez le donner au membre. Laisser vide pour bloquer son accès. Le compte en ligne se met à jour tout seul.'),
   onSubmit: (v) => {
     const m = getMember(code); const old = m.portal_password; m.portal_password = v.pwd; saveDB(); toast('Mot de passe enregistré.', 'ok'); render();
     // Même changement sur le compte en ligne du membre
     if (old !== v.pwd && typeof memberPasswordChanged === 'function') memberPasswordChanged(code, old, v.pwd);
   },
 });
-ACTIONS.defaultPwds = () => {
-  let n = 0; DB.members.forEach((m) => { if (!m.portal_password) { m.portal_password = m.code.toLowerCase(); n++; } });
-  saveDB(); toast(n + ' mot(s) de passe généré(s).', 'ok'); render();
-};
+/* Repart de zéro : aucun membre n'a plus de mot de passe ni d'accès en ligne, le trésorier les redonne un par un */
+ACTIONS.clearPwds = () => confirmBox('Effacer tous les mots de passe',
+  'Tous les membres perdent l’accès (sur l’application et en ligne) jusqu’à ce que vous leur donniez un nouveau mot de passe avec « Définir ». Continuer ?', () => {
+    let n = 0;
+    DB.members.forEach((m) => { if (m.portal_password || m.uid) { m.portal_password = ''; n++; if (typeof memberPasswordChanged === 'function') memberPasswordChanged(m.code, '', ''); } });
+    saveDB(); toast(n + ' mot(s) de passe effacé(s). Donnez maintenant un mot de passe à chaque membre avec « Définir ».', 'ok'); render();
+  }, 'Tout effacer');
 ACTIONS.userEdit = (id) => {
   const u = id ? USERS[id] : { role: 'admin', fullname: '', position: '', pwd: '' };
   openModal({

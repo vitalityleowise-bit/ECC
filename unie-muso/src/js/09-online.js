@@ -21,6 +21,19 @@ const PART_SIZE = 300000; // caractères par morceau (un document Firestore ne d
 
 /* ---------- Utilitaires ---------- */
 function fbEmail(id) { return String(id).toLowerCase().replace(/[^a-z0-9]/g, '') + '@uniemuso.app'; }
+/* Membres : un compte en ligne PAR mot de passe (m005-<empreinte>@uniemuso.app).
+   Firebase n'accepte de changer un mot de passe qu'avec l'ANCIEN : ici on n'en a jamais besoin.
+   Nouveau mot de passe = nouveau compte ; l'ancien perd son rôle, donc tout accès aux données. */
+async function pwdTag(code, pwd) {
+  const txt = 'UNIE-MUSO|' + String(code).toUpperCase() + '|' + pwd;
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+    return Array.from(new Uint8Array(buf)).slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (_e) { return hashStr(txt).replace(/[^a-z0-9]/g, ''); }
+}
+async function memberEmail(code, pwd) { return String(code).toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + (await pwdTag(code, pwd)) + '@uniemuso.app'; }
+function isUserId(id) { return Object.keys(USERS).some((k) => k.toLowerCase() === String(id).toLowerCase()); }
+async function loginEmail(id, pwd) { return isUserId(id) ? fbEmail(id) : memberEmail(id, pwd); }
 function fbPwd(p) { return 'UM#' + String(p) + '#2026'; }
 function hashStr(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '.' + s.length; }
 function plain(o) { return JSON.parse(JSON.stringify(o === undefined ? null : o)); }
@@ -54,15 +67,16 @@ function askNewPassword() {
   const id = SESSION.type === 'member' ? SESSION.code : SESSION.id;
   let tries = 0;
   openModal({
-    title: 'Nouveau mot de passe', submit: 'Valider',
-    body: '<p style="margin:0 0 12px">Votre mot de passe a été changé par le trésorier. Entrez le <b>nouveau</b> mot de passe pour continuer en ligne. Vos données restent sur ce téléphone.</p>' +
-      field('Nouveau mot de passe', '<input name="np" id="np" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" required>') +
+    title: 'Mot de passe', submit: 'Valider',
+    body: '<p style="margin:0 0 12px">Entrez le mot de passe que le trésorier vous a donné pour continuer en ligne. Vos données restent sur ce téléphone.</p>' +
+      field('Mot de passe', '<div style="display:flex;gap:6px"><input name="np" id="np" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" required style="flex:1;min-width:0">' +
+        '<button type="button" class="btn" onclick="var i=document.getElementById(\'np\');i.type=i.type===\'password\'?\'text\':\'password\';this.textContent=i.type===\'password\'?\'Voir\':\'Cacher\'">Voir</button></div>') +
       '<div id="np-msg" class="muted" style="font-size:12.5px;margin-top:6px"></div>',
     onSubmit: (v) => {
       const pwd = (v.np || '').trim(); const msg = document.getElementById('np-msg');
       if (!pwd) { msg.textContent = 'Entrez le mot de passe.'; return false; }
       msg.textContent = 'Vérification…'; initOnline();
-      ONLINE.auth.signInWithEmailAndPassword(fbEmail(id), fbPwd(pwd)).then(() => {
+      loginEmail(id, pwd).then((em) => ONLINE.auth.signInWithEmailAndPassword(em, fbPwd(pwd))).then(() => {
         if (SESSION.type === 'member') { const m = getMember(SESSION.code); if (m) { m.portal_password = pwd; store.set(KEYS.db, DB); } }
         else if (USERS[SESSION.id]) { USERS[SESSION.id].pwd = pwd; saveUsers(); }
         ONLINE.badPwd = false; closeModal(); toast('Mot de passe mis à jour. Connexion en ligne…', 'ok'); goOnline(true);
@@ -100,21 +114,32 @@ function initOnline() {
   ONLINE.auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(() => {});
   return true;
 }
-function sessionCredentials() {
+async function sessionCredentials() {
   if (!SESSION) return null;
   if (SESSION.type === 'user') { const u = USERS[SESSION.id]; return u ? { email: fbEmail(SESSION.id), pwd: u.pwd } : null; }
-  const m = getMember(SESSION.code); return m && m.portal_password ? { email: fbEmail(m.code), pwd: m.portal_password } : null;
+  const m = getMember(SESSION.code); return m && m.portal_password ? { email: await memberEmail(m.code, m.portal_password), pwd: m.portal_password } : null;
 }
 function errText(e) {
   const c = (e && e.code) || '';
   if (/permission-denied/.test(c)) return 'Accès refusé par le serveur (règles de sécurité non installées, ou compte en ligne pas encore créé par le trésorier).';
   if (/invalid-credential|wrong-password|invalid-login|user-not-found/.test(c)) {
-    if (SESSION && SESSION.type === 'member') return 'Votre mot de passe a changé : touchez « ! Problème en ligne » en haut de l’écran et entrez le NOUVEAU mot de passe donné par le trésorier.';
-    return 'Compte en ligne introuvable ou mot de passe différent : le trésorier doit créer ou mettre à jour les comptes en ligne (Paramètres > En ligne).';
+    if (SESSION && SESSION.type === 'member') return 'Mot de passe refusé en ligne : touchez « ! Problème en ligne » en haut de l’écran et entrez le mot de passe donné par le trésorier.';
+    return 'Compte en ligne introuvable ou mot de passe différent.';
   }
   if (/too-many-requests/.test(c)) return 'Firebase bloque cet appareil pour un moment : trop d’essais avec un mauvais mot de passe. N’essayez plus pendant 30 minutes ; l’application réessaiera seule. Ensuite, touchez « ! Problème en ligne » et entrez le NOUVEAU mot de passe.';
   if (/network|unavailable|deadline/.test(c)) return 'Connexion Internet instable : nouvel essai automatique dans 20 secondes (' + c + ').';
   return ((e && e.message) || String(e)) + (c ? ' (' + c + ')' : '');
+}
+/* Membre connecté mais sans accès (son mot de passe a été changé ou effacé par le trésorier) :
+   on lui demande le mot de passe actuel, comme pour un mot de passe refusé */
+function accessRemoved(e) {
+  if (!SESSION || SESSION.type !== 'member' || !/permission-denied/.test((e && e.code) || '')) return false;
+  stopListeners(); ONLINE.who = '';
+  if (ONLINE.auth) ONLINE.auth.signOut().catch(() => {});
+  ONLINE.badPwd = true;
+  setOnlineStatus('err', 'Votre mot de passe a été changé par le trésorier : touchez « ! Problème en ligne » et entrez le nouveau.');
+  maybeAskPwd();
+  return true;
 }
 async function goOnline(manual) {
   clearTimeout(ONLINE.retry);
@@ -123,7 +148,7 @@ async function goOnline(manual) {
   if (!SESSION || !onlineAvailable()) { setOnlineStatus('off'); return; }
   if (!navigator.onLine) { setOnlineStatus('off', 'Hors ligne : vos changements sont gardés et seront envoyés au retour d’Internet.'); return; }
   initOnline();
-  const cred = sessionCredentials();
+  const cred = await sessionCredentials();
   if (!cred) { setOnlineStatus('err', 'Pas de mot de passe pour ce compte.'); return; }
   // Sécurité : jamais en ligne avec le mot de passe admin par défaut
   if (SESSION.type === 'user' && SESSION.id === 'admin' && USERS.admin.pwd === 'admin') {
@@ -148,6 +173,7 @@ async function goOnline(manual) {
     touchSeen(true);
     processPendingPwds(false);
   } catch (e) {
+    if (accessRemoved(e)) return;
     setOnlineStatus('err', errText(e));
     // Nouvel essai automatique SEULEMENT pour un problème de réseau. Un mauvais mot de passe essayé
     // encore et encore fait bloquer l'appareil (et toute la connexion partagée) par Firebase.
@@ -350,7 +376,7 @@ function fixDemandeIds(list) {
 }
 function startListeners() {
   const fs = ONLINE.fs; const me = mySelfCode(); const comite = isOnlineComite();
-  const fail = (e) => setOnlineStatus('err', errText(e));
+  const fail = (e) => { if (!accessRemoved(e)) setOnlineStatus('err', errText(e)); };
   ONLINE.unsub.push(fs.collection('db').onSnapshot(onRemoteDb, fail));
   Object.keys(COLLAB).forEach((arr) => {
     const conf = COLLAB[arr];
@@ -382,39 +408,44 @@ function onlineRoleFor(m) {
   if (m.code === SETTINGS.editor_code) return 'editeur';
   return m.is_comite ? 'comite' : 'membre';
 }
-/* Crée ou met à jour le compte en ligne de chaque membre actif, et son rôle */
+/* Compte en ligne d'un membre pour son mot de passe ACTUEL : créé s'il n'existe pas, rôle posé,
+   ancien compte (ancien mot de passe) privé de rôle donc de tout accès */
+async function ensureMemberAccount(auth2, m) {
+  const email = await memberEmail(m.code, m.portal_password); let uid; let created = false;
+  try { const c = await auth2.createUserWithEmailAndPassword(email, fbPwd(m.portal_password)); uid = c.user.uid; created = true; }
+  catch (e) {
+    if (!/email-already-in-use/.test(e.code || '')) throw e;
+    const c = await auth2.signInWithEmailAndPassword(email, fbPwd(m.portal_password)); uid = c.user.uid; // même mot de passe : toujours accepté
+  }
+  await auth2.signOut().catch(() => {});
+  await ONLINE.fs.collection('roles').doc(uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) });
+  if (m.uid && m.uid !== uid) await ONLINE.fs.collection('roles').doc(m.uid).delete().catch(() => {});
+  m.uid = uid;
+  return created;
+}
+async function removeMemberAccess(m) {
+  if (m.uid) await ONLINE.fs.collection('roles').doc(m.uid).delete().catch(() => {});
+  m.uid = '';
+}
+/* Tous les membres : compte pour le mot de passe actuel ; sans mot de passe ou inactif = aucun accès */
 async function syncMemberAccounts(onProgress) {
   if (!isAdmin() || !ONLINE.who) throw new Error('Connectez-vous en ligne avec le compte admin.');
   const auth2 = secondaryAuth();
   await auth2.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(() => {});
   const res = { crees: 0, maj: 0, erreurs: [] };
-  const list = DB.members.slice().sort(sortByCode);
-  for (const m of list) {
+  for (const m of DB.members.slice().sort(sortByCode)) {
     if (onProgress) onProgress(m.code);
     try {
-      if (m.statut === 'Inactif' || !m.portal_password) {
-        if (m.uid) await ONLINE.fs.collection('roles').doc(m.uid).delete().catch(() => {});
-        continue;
-      }
-      let uid = m.uid;
-      try {
-        const c = await auth2.createUserWithEmailAndPassword(fbEmail(m.code), fbPwd(m.portal_password)); uid = c.user.uid; res.crees++;
-        rememberOnlinePwd(m.code, m.portal_password);
-      } catch (e) {
-        if (!/email-already-in-use/.test(e.code || '')) throw e;
-        const c = await signInMemberAccount(auth2, m); uid = c.user.uid; res.maj++;
-      }
-      await auth2.signOut().catch(() => {});
-      await ONLINE.fs.collection('roles').doc(uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) });
-      m.uid = uid;
-      { const st2 = pwdMemory(); if (st2.pendingPwd) delete st2.pendingPwd[m.code]; }
+      if (m.statut === 'Inactif' || !m.portal_password) { await removeMemberAccess(m); continue; }
+      if (await ensureMemberAccount(auth2, m)) res.crees++; else res.maj++;
+      const st2 = pwdMemory(); if (st2.pendingPwd) delete st2.pendingPwd[m.code];
     } catch (e) {
       await auth2.signOut().catch(() => {});
-      if (/too-many-requests/.test(e.code || '')) { res.erreurs.push('Firebase bloque les essais pour un moment (trop d’essais). Attendez 30 minutes, puis cliquez à nouveau : les comptes déjà faits ne sont pas refaits.'); break; }
-      res.erreurs.push(e.code === 'unie/old-password-unknown' ? e.message : m.code + ' : ' + errText(e));
+      if (/too-many-requests/.test(e.code || '')) { res.erreurs.push('Firebase demande d’attendre un peu. Recliquez dans 30 minutes : les comptes déjà faits ne sont pas refaits.'); break; }
+      res.erreurs.push(m.code + ' : ' + errText(e));
     }
   }
-  saveDB(); schedulePush();
+  saveSyncState(); saveDB(); schedulePush();
   return res;
 }
 /* Mise à jour des rôles seulement (après un changement de comité ou d'éditeur) */
@@ -426,69 +457,45 @@ async function syncRolesOnly() {
     else await ONLINE.fs.collection('roles').doc(m.uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) }).catch(() => {});
   }
 }
-/* ---------- Mots de passe des comptes en ligne ----------
-   Firebase ne laisse changer un mot de passe qu'en donnant l'ANCIEN. L'appareil du trésorier garde donc
-   (ici seulement, jamais envoyé) le mot de passe actuellement posé sur chaque compte en ligne,
-   et les anciens mots de passe, pour pouvoir les remplacer plus tard. */
-function pwdMemory() { const st = syncState(); st.pwds = st.pwds || {}; st.oldPwds = st.oldPwds || {}; return st; }
-function rememberOnlinePwd(code, pwd) { const st = pwdMemory(); st.pwds[code] = pwd; saveSyncState(); }
-function rememberOldPwd(code, pwd) {
-  if (!pwd) return; const st = pwdMemory(); const l = st.oldPwds[code] = st.oldPwds[code] || [];
-  if (!l.includes(pwd)) l.push(pwd); if (l.length > 8) l.shift(); saveSyncState();
-}
+/* ---------- Mots de passe des membres : appliqués en ligne automatiquement ---------- */
+function pwdMemory() { const st = syncState(); st.pendingPwd = st.pendingPwd || {}; return st; }
 function secondaryAuth() {
   const sec = firebase.apps.find((a) => a.name === 'comptes') || firebase.initializeApp(Object.assign({}, FB_CONF, window.UNIE_EMULATOR ? { projectId: window.UNIE_EMULATOR.projectId } : {}), 'comptes');
   const auth2 = sec.auth(); if (window.UNIE_EMULATOR && !auth2._unieEmu) { auth2.useEmulator(window.UNIE_EMULATOR.auth); auth2._unieEmu = true; }
   return auth2;
 }
-/* Connexion au compte en ligne d'un membre : nouveau mot de passe, sinon un ancien (puis remplacé) */
-async function signInMemberAccount(auth2, m) {
-  const st = pwdMemory(); const newPwd = m.portal_password;
-  try { const c = await auth2.signInWithEmailAndPassword(fbEmail(m.code), fbPwd(newPwd)); rememberOnlinePwd(m.code, newPwd); return c; } catch (e) {
-    if (!/invalid-credential|wrong-password|invalid-login/.test(e.code || '')) throw e;
-  }
-  const tries = [st.pwds[m.code]].concat((st.oldPwds[m.code] || []).slice().reverse(), [m.code.toLowerCase(), m.code]).filter((p, i, a) => p && p !== newPwd && a.indexOf(p) === i);
-  for (const p of tries.slice(0, 3)) {
-    await new Promise((r) => setTimeout(r, 700)); // pas d'essais en rafale (Firebase bloquerait la connexion)
-    let c; try { c = await auth2.signInWithEmailAndPassword(fbEmail(m.code), fbPwd(p)); } catch (e) { if (/too-many-requests/.test(e.code || '')) throw e; continue; }
-    await c.user.updatePassword(fbPwd(newPwd)); rememberOnlinePwd(m.code, newPwd); return c;
-  }
-  const err = new Error(m.code + ' : l’ancien mot de passe en ligne est inconnu. Console Firebase > Authentication > Utilisateurs : supprimez « ' + fbEmail(m.code) + ' », puis cliquez à nouveau « Créer / mettre à jour les comptes ».');
-  err.code = 'unie/old-password-unknown'; throw err;
-}
-/* Mot de passe d'un membre modifié (fiche membre ou onglet portail) : aussi sur son compte en ligne */
-function memberPasswordChanged(code, oldPwd, newPwd) {
+/* Le trésorier donne, change ou efface le mot de passe d'un membre : le compte en ligne suit tout seul */
+function memberPasswordChanged(code, _oldPwd, _newPwd) {
   if (!isAdmin()) return;
-  rememberOldPwd(code, oldPwd);
-  const m = getMember(code); if (!m || !m.uid || !newPwd) return;
-  const st = pwdMemory(); st.pendingPwd = st.pendingPwd || {}; st.pendingPwd[code] = true; saveSyncState();
-  if (!ONLINE.who) { toast('Mot de passe enregistré. Le compte en ligne de ' + code + ' sera mis à jour tout seul dès le retour d’Internet.', 'ok'); return; }
+  const st = pwdMemory(); st.pendingPwd[code] = true; saveSyncState();
+  if (!ONLINE.who) { toast('Mot de passe enregistré. Le compte en ligne de ' + code + ' sera prêt tout seul dès le retour d’Internet.', 'ok'); return; }
   processPendingPwds(true);
 }
-/* Comptes en ligne dont le mot de passe attend d'être changé : traités dès que le trésorier est en ligne */
 async function processPendingPwds(verbose) {
   if (!isAdmin() || !ONLINE.who || ONLINE.pwdBusy) return;
-  const st = pwdMemory(); const codes = Object.keys(st.pendingPwd || {});
+  const st = pwdMemory(); const codes = Object.keys(st.pendingPwd);
   if (!codes.length) return;
-  ONLINE.pwdBusy = true; const auth2 = secondaryAuth(); const done = []; let problem = '';
+  ONLINE.pwdBusy = true; const auth2 = secondaryAuth(); const done = []; const removed = []; let problem = '';
   try {
     for (const code of codes) {
       const m = getMember(code);
-      if (!m || !m.uid || !m.portal_password || m.statut === 'Inactif') { delete st.pendingPwd[code]; continue; }
-      try { await signInMemberAccount(auth2, m); await auth2.signOut().catch(() => {}); delete st.pendingPwd[code]; done.push(code); }
-      catch (e) {
+      try {
+        if (!m) { delete st.pendingPwd[code]; continue; }
+        if (m.statut === 'Inactif' || !m.portal_password) { await removeMemberAccess(m); removed.push(code); }
+        else { await ensureMemberAccount(auth2, m); done.push(code); }
+        delete st.pendingPwd[code];
+      } catch (e) {
         await auth2.signOut().catch(() => {});
         const c = e.code || '';
-        if (/network|unavailable/.test(c)) break; // on réessaiera au prochain retour en ligne
-        if (/too-many-requests/.test(c)) { problem = 'Firebase demande d’attendre un peu : les mots de passe restants seront mis à jour automatiquement plus tard.'; break; }
-        if (c === 'unie/old-password-unknown') { delete st.pendingPwd[code]; problem = e.message; continue; }
+        if (/network|unavailable/.test(c)) break; // au prochain retour en ligne
+        if (/too-many-requests/.test(c)) { problem = 'Firebase demande d’attendre un peu : les comptes restants seront faits automatiquement plus tard.'; break; }
         problem = code + ' : ' + errText(e);
       }
-      await new Promise((r) => setTimeout(r, 800));
     }
   } finally { ONLINE.pwdBusy = false; saveSyncState(); }
-  if (done.length && (verbose || problem)) toast('Compte(s) en ligne mis à jour : ' + done.join(', ') + '.', 'ok');
-  else if (done.length) toast('Mots de passe en ligne mis à jour : ' + done.join(', ') + '.', 'ok');
+  if (done.length || removed.length) saveDB();
+  if (done.length) toast('Compte(s) en ligne prêt(s) : ' + done.join(', ') + '.', 'ok');
+  else if (removed.length && verbose) toast('Accès en ligne retiré : ' + (removed.length > 3 ? removed.length + ' membres' : removed.join(', ')) + '.', 'ok');
   if (problem) toast(problem, 'err');
 }
 
@@ -496,7 +503,7 @@ async function processPendingPwds(verbose) {
 async function onlineFirstLogin(id, pwd) {
   if (!onlineAvailable() || !navigator.onLine) return false;
   initOnline();
-  try { await ONLINE.auth.signInWithEmailAndPassword(fbEmail(id), fbPwd(pwd)); } catch (_e) { return false; }
+  try { await ONLINE.auth.signInWithEmailAndPassword(await loginEmail(id, pwd), fbPwd(pwd)); } catch (_e) { return false; }
   // Télécharge les données puis ouvre la session locale
   const snap = await ONLINE.fs.collection('db').get();
   onRemoteDb(snap);
