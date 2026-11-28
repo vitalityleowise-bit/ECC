@@ -75,7 +75,7 @@ PAGES.dashboard = function () {
   const late = DB.members.filter((m) => m.statut !== 'Inactif').map((m) => memberStats(m.code)).filter((s) => s.reste > 0);
   const pending = DB.demandes_pret.filter((d) => d.statut === 'En attente');
   const unnamed = DB.members.filter((m) => !m.nom).length;
-  return importBanner() + meetingBanner() +
+  return meetingBanner() +
     (unnamed ? '<div class="banner soft"><span class="bt">' + unnamed + ' membre(s) sans nom.</span><span>Importez votre sauvegarde ou complétez les fiches dans « Membres ».</span><div class="right"><button class="btn btn-sm" data-go="membres">Ouvrir Membres</button></div></div>' : '') +
     pageHead('Gestion', t('dashboard'), 'Situation au ' + esc(fmtD(today())) + ' · exercice ' + esc(fiscalLabel())) +
     '<div class="kpis">' +

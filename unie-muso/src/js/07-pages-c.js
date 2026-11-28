@@ -394,14 +394,50 @@ ACTIONS.mrFull = () => { STATE.rmonth = STATE.mrmonth || lastReportMonth(); go('
 function myMember() { return currentMember(); }
 function infoRow(label, val) { return '<dt>' + esc(label) + '</dt><dd>' + (val ? esc(val) : '<span class="muted">—</span>') + '</dd>'; }
 function monthsSince(d) { d = parseD(d); if (!d) return 0; const t0 = today(); return Math.max(0, (t0.getFullYear() - d.getFullYear()) * 12 + t0.getMonth() - d.getMonth()); }
-/* Mon profil : grande photo, informations personnelles, situation, présences, réunions, messages au comité */
-PAGES.moncompte = function () {
-  const m = myMember(); if (!m) return '';
-  const s = memberStats(m.code);
-  const aNoter = m.is_comite ? DB.demandes_pret.filter((d) => d.statut === 'En attente' && d.code_membre !== m.code) : [];
-  const anc = monthsSince(m.date_adhesion);
-  return importBanner() + meetingBanner() + loanBanner(m.code) +
-    '<section class="panel profile"><div class="profile-head">' +
+/* ---------- Présentation du haut de « Mon profil » (choisie dans Paramètres) ---------- */
+const PROFILE_STYLES = { classique: 'Classique', carte: 'Carte de membre', banniere: 'Bannière', essentiel: 'Essentiel' };
+function profileInfos(m, anc) {
+  return [['Téléphone', m.telephone], ['E-mail', m.email], ['Adresse', m.adresse], ['NIF', m.nif], ['Date de naissance', m.date_naissance], ['Profession', m.profession],
+    ['Membre depuis', m.date_adhesion ? m.date_adhesion + (anc ? ' (' + anc + ' mois)' : '') : ''], ['Poste au comité', m.is_comite ? m.comite_poste || 'Membre du comité' : '']];
+}
+function profilePhoto(m, cls) { return '<div class="' + cls + '">' + (m.photo ? '<img alt="Photo de ' + esc(memberName(m)) + '" src="' + esc(m.photo) + '">' : '<span>' + esc(initials(m)) + '</span>') + '</div>'; }
+const PROFILE_FIX = '<p class="pv-fix">Une information manque ou est fausse ? Écrivez au comité plus bas : le trésorier mettra votre fiche à jour.</p>';
+function profileTop(m, s, anc) {
+  const st = SETTINGS.profile_style || 'classique';
+  const meet = esc(longDate(nextMeeting())) + ' · ' + esc(SETTINGS.meeting_hour);
+  const infos = profileInfos(m, anc);
+  const rows = (list) => list.map((x) => '<div class="pv-row"><span>' + esc(x[0]) + '</span><b>' + (x[1] ? esc(x[1]) : '<i>—</i>') + '</b></div>').join('');
+  const pct = s.attendu ? Math.min(100, Math.round(s.total / s.attendu * 100)) : 100;
+  if (st === 'carte') {
+    return '<section class="pv-card-wrap"><div class="pv-card">' +
+        '<div class="pv-card-top"><span class="pv-brand">UNIE-MUSO</span><span class="pv-kind">Kat manm</span></div>' +
+        '<div class="pv-card-main">' + profilePhoto(m, 'pv-ph') +
+          '<div class="pv-card-id"><div class="pv-nm">' + esc(memberName(m)) + '</div>' +
+          '<div class="pv-code">' + m.code + '</div>' +
+          '<div class="pv-tags"><span class="pv-tag ' + (m.statut === 'Actif' ? 'ok' : '') + '">' + esc(m.statut) + '</span>' + (m.is_comite ? '<span class="pv-tag gold">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div></div></div>' +
+        '<div class="pv-card-foot"><span>Manm depi ' + esc(m.date_adhesion || '—') + '</span><span>Petit-Goâve · Haïti</span></div>' +
+      '</div>' +
+      '<div class="pv-tiles"><div class="pv-tile pay"><span>' + t('to_pay') + '</span><b class="num">' + money(s.totalAVerser) + '</b><small>pwochen reyinyon</small></div>' +
+        '<div class="pv-tile"><span>' + t('next_meeting') + '</span><b>' + meet + '</b><small>' + (s.reste ? 'Reta: ' + money(s.reste) : 'Kotizasyon a jou') + '</small></div></div>' +
+      '<div class="panel pv-info"><div class="panel-head"><h2>Mes informations</h2></div><div class="pv-rows">' + rows(infos) + '</div>' + PROFILE_FIX + '</div></section>';
+  }
+  if (st === 'banniere') {
+    return '<section class="panel pv-ban"><div class="pv-cover"></div>' + profilePhoto(m, 'pv-ph') +
+      '<div class="pv-ban-id"><div class="pv-nm">' + esc(memberName(m)) + '</div>' +
+        '<div class="pv-tags"><span class="pv-tag line">' + m.code + '</span><span class="pv-tag ' + (m.statut === 'Actif' ? 'ok' : '') + '">' + esc(m.statut) + '</span>' + (m.is_comite ? '<span class="pv-tag gold">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div></div>' +
+      '<div class="pv-stats"><div><b class="num">' + fmt(s.verte) + '</b><span>Epay (Kès Vèt)</span></div><div><b class="num">' + fmt(s.total) + '</b><span>Total vèse</span></div><div class="pay"><b class="num">' + fmt(s.totalAVerser) + '</b><span>' + t('to_pay') + '</span></div></div>' +
+      '<div class="pv-meet">' + t('next_meeting') + ' : <b>' + meet + '</b></div>' +
+      '<div class="pv-grid">' + infos.map((x) => '<div class="pv-cell"><span>' + esc(x[0]) + '</span><b>' + (x[1] ? esc(x[1]) : '<i>—</i>') + '</b></div>').join('') + '</div>' + PROFILE_FIX + '</section>';
+  }
+  if (st === 'essentiel') {
+    const prenom = (m.prenom || memberName(m)).split(' ')[0];
+    return '<section class="pv-ess"><div class="pv-hello">' + profilePhoto(m, 'pv-ph') + '<div><div class="pv-hi">Bonjou, ' + esc(prenom) + '</div><div class="pv-sub">' + m.code + ' · ' + esc(m.statut) + (m.is_comite ? ' · ' + esc(m.comite_poste || 'Comité') : '') + '</div></div></div>' +
+      '<div class="pv-due"><div class="pv-due-l"><span>Pou pote nan pwochen reyinyon an</span><b class="num">' + money(s.totalAVerser) + '</b><small>' + meet + '</small></div>' +
+        '<div class="pv-due-r"><div><span>Kotizasyon</span><b class="num">' + money(s.cotMois) + '</b></div>' + (s.loanDue ? '<div><span>Mansyalite prè</span><b class="num">' + money(s.loanDue.du) + '</b></div>' : '') + (s.reste ? '<div><span>Reta</span><b class="num">' + money(s.reste) + '</b></div>' : '') + (s.amendesDues ? '<div><span>Amand</span><b class="num">' + money(s.amendesDues) + '</b></div>' : '') + '</div></div>' +
+      '<div class="pv-prog"><div class="pv-prog-h"><span>Kotizasyon ane a</span><b class="num">' + money(s.total) + ' / ' + money(s.attendu) + '</b></div><div class="pv-bar"><i style="width:' + pct + '%"></i></div></div>' +
+      '<details class="panel pv-more"><summary>Mes informations personnelles</summary><div class="pv-rows">' + rows(infos) + '</div>' + PROFILE_FIX + '</details></section>';
+  }
+  return '<section class="panel profile" data-style="classique"><div class="profile-head">' +
       '<div class="profile-photo">' + (m.photo ? '<img alt="Photo de ' + esc(memberName(m)) + '" src="' + esc(m.photo) + '">' : '<span>' + esc(initials(m)) + '</span>') + '</div>' +
       '<div class="profile-id"><div class="nm">' + esc(memberName(m)) + '</div>' +
         '<div class="muted" style="margin:4px 0 10px"><span class="code">' + m.code + '</span> · ' + statusBadge(m.statut) + (m.is_comite ? ' <span class="badge b-navy">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div>' +
@@ -411,8 +447,16 @@ PAGES.moncompte = function () {
         infoRow('Téléphone', m.telephone) + infoRow('E-mail', m.email) + infoRow('Adresse', m.adresse) + infoRow('NIF', m.nif) +
         infoRow('Date de naissance', m.date_naissance) + infoRow('Profession', m.profession) +
         infoRow('Membre depuis', m.date_adhesion ? m.date_adhesion + (anc ? ' (' + anc + ' mois)' : '') : '') + infoRow('Poste au comité', m.is_comite ? m.comite_poste || 'Membre du comité' : '') +
-      '</dl><div class="muted" style="font-size:11.5px;margin-top:8px">Une information manque ou est fausse ? Écrivez au comité ci-dessous : le trésorier mettra votre fiche à jour.</div></div></section>' +
-    (aNoter.length ? panel('Demandes à évaluer (comité)', table(['N°', 'Membre', ['Demandé', 'n'], 'Ma note', ''], aNoter.map((d) => {
+      '</dl><div class="muted" style="font-size:11.5px;margin-top:8px">Une information manque ou est fausse ? Écrivez au comité ci-dessous : le trésorier mettra votre fiche à jour.</div></div></section>';
+}
+/* Mon profil : grande photo, informations personnelles, situation, présences, réunions, messages au comité */
+PAGES.moncompte = function () {
+  const m = myMember(); if (!m) return '';
+  const s = memberStats(m.code);
+  const aNoter = m.is_comite ? DB.demandes_pret.filter((d) => d.statut === 'En attente' && d.code_membre !== m.code) : [];
+  const anc = monthsSince(m.date_adhesion);
+  return meetingBanner() + loanBanner(m.code) + profileTop(m, s, anc) +
+        (aNoter.length ? panel('Demandes à évaluer (comité)', table(['N°', 'Membre', ['Demandé', 'n'], 'Ma note', ''], aNoter.map((d) => {
       const n = d.evaluation && d.evaluation.notes_comite ? d.evaluation.notes_comite[m.code] : undefined;
       return '<tr><td class="code">#' + d.id + '</td><td>' + esc(nameOf(d.code_membre)) + '</td><td class="n">' + fmt(d.montant_demande) + '</td><td>' + (n === undefined ? '<span class="badge b-orange">à donner</span>' : '<b class="num">' + fmt(n) + '/' + GRILLE.pts_comite + '</b>') + '</td>' +
         '<td class="act"><button class="btn btn-sm btn-accent" data-act="demEval" data-id="' + d.id + '">' + (n === undefined ? 'Donner ma note' : 'Voir / modifier') + '</button></td></tr>';
@@ -521,6 +565,7 @@ PAGES.parametres = function () {
       field('Début de l’exercice comptable', input('fiscal_start', RULES.fiscal_start, 'type="date"'), '', 'Exercice actuel : ' + esc(fiscalLabel()) + '. Exercice de la mutuelle : 1er avril → 31 mars (indépendant de l’exercice fiscal haïtien).') +
       field('Démarrage de la mutuelle', input('mutuelle_start', RULES.mutuelle_start, 'type="date"')) +
       field('Heure de la réunion', input('meeting_hour', SETTINGS.meeting_hour, 'type="time"'), '', 'Dernier jeudi du mois.') +
+      field('Présentation de « Mon profil »', '<select name="profile_style">' + Object.keys(PROFILE_STYLES).map((k) => '<option value="' + k + '"' + ((SETTINGS.profile_style || 'classique') === k ? ' selected' : '') + '>' + PROFILE_STYLES[k] + '</option>').join('') + '</select>', '', 'La même présentation pour tous les membres.') +
       field('Signature — Présidente', input('sign_presidente', SETTINGS.sign_presidente)) + field('Signature — Trésorier', input('sign_tresorier', SETTINGS.sign_tresorier)) +
       '<div class="full" style="display:flex;gap:12px;align-items:center">' + (logoImg() ? '<span style="width:56px;height:56px;display:inline-block">' + logoImg().replace('<img', '<img style="width:56px;height:56px;object-fit:contain"') + '</span>' : '') +
         '<button type="button" class="btn btn-sm" data-act="pickLogo">Changer le logo</button>' + (SETTINGS.logo ? '<button type="button" class="btn btn-sm" data-act="resetLogo">Logo d’origine</button>' : '') + '</div>' +
@@ -573,7 +618,7 @@ function formOf(el) { return formData(el.closest('form')); }
 ACTIONS.ptab = (id) => { STATE.ptab = id; render(); };
 ACTIONS.saveGeneral = (_i, el) => {
   const v = formOf(el);
-  SETTINGS.lang = v.lang; SETTINGS.meeting_hour = v.meeting_hour || '17:00'; SETTINGS.sign_presidente = v.sign_presidente; SETTINGS.sign_tresorier = v.sign_tresorier;
+  SETTINGS.lang = v.lang; SETTINGS.meeting_hour = v.meeting_hour || '17:00'; if (v.profile_style) SETTINGS.profile_style = v.profile_style; SETTINGS.sign_presidente = v.sign_presidente; SETTINGS.sign_tresorier = v.sign_tresorier;
   RULES.fiscal_start = v.fiscal_start || RULES.fiscal_start; RULES.mutuelle_start = v.mutuelle_start || RULES.mutuelle_start;
   saveSettings(); saveRules(); toast('Paramètres enregistrés.', 'ok'); render();
 };

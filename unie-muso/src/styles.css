@@ -353,3 +353,91 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .dl dd { min-width: 0; overflow-wrap: anywhere; }
 .net-status { border: 0; cursor: pointer; margin-right: 8px; font-family: var(--f-body); }
 @media (max-width: 860px) { .net-status { font-size: 0; padding: 4px 7px; } .net-status::first-letter { font-size: 12px; } .topbar .crumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+
+/* ---------- Mon profil : présentations au choix (Paramètres > Présentation du profil) ---------- */
+.pv-tag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.16); color: #fff; }
+.pv-tag.ok { background: #DDF1E0; color: var(--green); }
+.pv-tag.gold { background: #FFE3CC; color: #A34500; }
+.pv-tag.line { background: var(--navy-050); color: var(--navy); }
+.pv-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.pv-fix { font-size: 11.5px; color: var(--ink-3); margin: 0; padding: 10px 16px 14px; }
+.pv-rows { display: grid; }
+.pv-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 16px; border-top: 1px solid var(--line-soft); font-size: 13px; }
+.pv-row:first-child { border-top: 0; }
+.pv-row span { color: var(--ink-3); }
+.pv-row b { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.pv-row i, .pv-cell i { color: var(--ink-3); font-style: normal; font-weight: 400; }
+
+/* 1. Carte de membre */
+.pv-card-wrap { display: grid; gap: 12px; margin-bottom: 14px; }
+.pv-card { position: relative; overflow: hidden; border-radius: 18px; color: #fff; padding: 18px 20px 16px;
+  background: radial-gradient(circle at 105% -10%, rgba(232,101,10,.55) 0 28%, transparent 29%), linear-gradient(135deg, #1A3A6B 0%, #234C8A 60%, #16325C 100%);
+  box-shadow: 0 10px 26px rgba(26,58,107,.28); max-width: 560px; width: 100%; justify-self: center; }
+.pv-card::after { content: ""; position: absolute; right: -40px; bottom: -60px; width: 200px; height: 200px; border-radius: 50%; border: 22px solid rgba(255,255,255,.06); }
+.pv-card-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+.pv-brand { font-weight: 800; letter-spacing: .12em; }
+.pv-kind { color: #FFC59A; font-weight: 700; }
+.pv-card-main { display: flex; gap: 16px; align-items: center; margin: 16px 0 14px; position: relative; z-index: 1; }
+.pv-card .pv-ph { width: 92px; height: 92px; border-radius: 50%; overflow: hidden; flex: none; background: rgba(255,255,255,.14); border: 3px solid #fff; display: flex; align-items: center; justify-content: center; }
+.pv-ph img { width: 100%; height: 100%; object-fit: cover; }
+.pv-card .pv-ph span { font-size: 30px; font-weight: 800; color: #fff; }
+.pv-card-id { min-width: 0; display: grid; gap: 4px; }
+.pv-nm { font-family: var(--f-title); font-size: 21px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.pv-code { font-family: var(--f-num, monospace); font-size: 15px; letter-spacing: .18em; color: #CFDCF2; }
+.pv-card-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: #CFDCF2; border-top: 1px solid rgba(255,255,255,.16); padding-top: 10px; position: relative; z-index: 1; }
+.pv-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 560px; width: 100%; justify-self: center; }
+.pv-tile { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.pv-tile span { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+.pv-tile b { font-size: 14px; color: var(--navy); line-height: 1.3; }
+.pv-tile small { font-size: 11.5px; color: var(--ink-3); }
+.pv-tile.pay { background: #FFF4EC; border-color: #F7C9A6; }
+.pv-tile.pay b { font-size: 24px; color: var(--orange); font-weight: 800; }
+.pv-info { max-width: 560px; width: 100%; justify-self: center; margin: 0; }
+
+/* 2. Bannière */
+.pv-ban { overflow: hidden; text-align: center; padding-bottom: 0; }
+.pv-cover { height: 96px; background: linear-gradient(120deg, #1A3A6B, #2B5596 70%, #E8650A 140%); }
+.pv-ban .pv-ph { width: 118px; height: 118px; border-radius: 50%; overflow: hidden; margin: -62px auto 0; border: 5px solid #fff; background: var(--navy-050); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(26,58,107,.2); position: relative; }
+.pv-ban .pv-ph span { font-size: 38px; font-weight: 800; color: var(--navy); }
+.pv-ban-id { padding: 10px 16px 4px; display: grid; gap: 8px; justify-items: center; }
+.pv-ban .pv-nm { color: var(--navy); font-size: 22px; }
+.pv-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 14px 16px 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pv-stats > div { padding: 10px 6px; display: grid; gap: 2px; border-left: 1px solid var(--line-soft); min-width: 0; }
+.pv-stats > div:first-child { border-left: 0; }
+.pv-stats b { font-size: 17px; color: var(--navy); }
+.pv-stats .pay b { color: var(--orange); }
+.pv-stats span { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.pv-meet { margin: 12px 16px 0; padding: 9px 12px; background: var(--navy-050); border-radius: 10px; font-size: 13px; color: var(--navy); }
+.pv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px 16px 4px; text-align: left; }
+.pv-cell { border: 1px solid var(--line-soft); border-radius: 10px; padding: 8px 10px; display: grid; gap: 1px; min-width: 0; }
+.pv-cell span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; }
+.pv-cell b { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.pv-ban .pv-fix { text-align: left; }
+
+/* 3. Essentiel */
+.pv-ess { display: grid; gap: 12px; margin-bottom: 14px; }
+.pv-hello { display: flex; gap: 14px; align-items: center; }
+.pv-ess .pv-ph { width: 64px; height: 64px; border-radius: 18px; overflow: hidden; flex: none; background: var(--navy); display: flex; align-items: center; justify-content: center; }
+.pv-ess .pv-ph span { font-size: 22px; font-weight: 800; color: #fff; }
+.pv-hi { font-family: var(--f-title); font-size: 24px; font-weight: 800; color: var(--navy); line-height: 1.15; }
+.pv-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.pv-due { display: grid; grid-template-columns: 1.2fr 1fr; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid var(--line); }
+.pv-due-l { background: var(--orange); color: #fff; padding: 16px; display: grid; gap: 4px; align-content: center; }
+.pv-due-l span { font-size: 12px; font-weight: 600; opacity: .9; }
+.pv-due-l b { font-size: 30px; font-weight: 800; line-height: 1.1; }
+.pv-due-l small { font-size: 12px; opacity: .9; }
+.pv-due-r { padding: 12px 14px; display: grid; gap: 8px; align-content: center; }
+.pv-due-r > div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.pv-due-r span { color: var(--ink-3); }
+.pv-prog { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+.pv-prog-h { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; flex-wrap: wrap; }
+.pv-prog-h span { color: var(--ink-3); }
+.pv-bar { height: 10px; background: var(--navy-050); border-radius: 999px; overflow: hidden; }
+.pv-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--green), #4CAF50); border-radius: 999px; }
+.pv-more { margin: 0; }
+.pv-more summary { cursor: pointer; padding: 12px 16px; font-weight: 700; color: var(--navy); }
+@media (max-width: 520px) {
+  .pv-tiles { grid-template-columns: 1fr; }
+  .pv-due { grid-template-columns: 1fr; }
+  .pv-grid { grid-template-columns: 1fr; }
+}
