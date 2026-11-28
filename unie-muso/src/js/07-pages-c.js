@@ -417,14 +417,19 @@ function profileTop(m, s, anc) {
     if (s.amendesDues > 0) why.push('Amand pou peye: ' + money(s.amendesDues));
     if (pretRetard) why.push('Mansyalite prè an reta');
     const ok = !why.length;
+    // Exercice en cours (1er avril → 31 mars), mois cotisés, présences
+    const fsd = parseD(RULES.fiscal_start) || new Date(2026, 3, 1); const td = today();
+    const ey = td.getMonth() >= fsd.getMonth() ? td.getFullYear() : td.getFullYear() - 1;
+    const nbM = num(RULES.nb_cotisations_attendues); const paidM = COT() ? Math.min(nbM, Math.floor(s.total / COT() + 1e-9)) : 0;
     return '<section class="pv-card-wrap"><div class="pv-card ' + (ok ? 'is-ok' : 'is-late') + '">' +
-        '<div class="pv-card-top"><span class="pv-brand">UNIE-MUSO</span><span class="pv-kind">Kat manm</span></div>' +
+        '<div class="pv-card-top"><span class="pv-logo">' + logoImg('') + '</span><span class="pv-brand">UNIE-MUSO<small>Mityèl solidarite</small></span><span class="pv-kind">Kat manm<small>Egzèsis ' + ey + '-' + (ey + 1) + '</small></span></div>' +
         '<div class="pv-card-main">' + profilePhoto(m, 'pv-ph') +
           '<div class="pv-card-id"><div class="pv-nm">' + esc(memberName(m)) + '</div>' +
           '<div class="pv-code">' + m.code + '</div>' +
           '<div class="pv-tags"><span class="pv-tag ' + (m.statut === 'Actif' ? 'ok' : '') + '">' + esc(m.statut) + '</span>' + (m.is_comite ? '<span class="pv-tag gold">' + esc(m.comite_poste || 'Comité') + '</span>' : '') + '</div></div></div>' +
+        '<div class="pv-mini"><div><b class="num">' + fmt(s.verte) + '</b><span>Epay (HTG)</span></div><div><b class="num">' + paidM + '/' + nbM + '</b><span>Mwa peye</span></div><div><b class="num">' + s.presents + '/' + s.meetings.length + '</b><span>Reyinyon</span></div></div>' +
         '<div class="pv-state">' + (ok ? '✓ A jou' : '! Pa a jou') + '<small>' + (ok ? 'Kotizasyon, amand ak prè: tout peye' : esc(why.join(' · '))) + '</small></div>' +
-        '<div class="pv-card-foot"><span>Manm depi ' + esc(m.date_adhesion || '—') + '</span><span>Petit-Goâve · Haïti</span></div>' +
+        '<div class="pv-card-foot"><span>Manm depi ' + esc(m.date_adhesion || '—') + (anc ? ' · ' + anc + ' mwa' : '') + '</span><span>Petit-Goâve · Haïti</span></div>' +
       '</div>' +
       '<div class="pv-tiles"><div class="pv-tile pay"><span>' + t('to_pay') + '</span><b class="num">' + money(s.totalAVerser) + '</b><small>pwochen reyinyon</small></div>' +
         '<div class="pv-tile"><span>' + t('next_meeting') + '</span><b>' + meet + '</b><small>' + (s.reste ? 'Reta: ' + money(s.reste) : 'Kotizasyon a jou') + '</small></div></div>' +
