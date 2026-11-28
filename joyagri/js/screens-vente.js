@@ -132,7 +132,7 @@
       if (cart.lines.length) right.appendChild(drawPayment(calc));
       // barre résumé (téléphone)
       if (cart.lines.length) sticky.appendChild(h('div', { class: 'card', style: { position: 'sticky', bottom: 'calc(var(--nav-h) + 8px)', zIndex: 5, display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', padding: '10px 14px' }, id: 'cartbar' },
-        h('div', { style: { flex: 1 } }, h('div', { class: 'small muted' }, `${cart.lines.length} ligne(s)`), h('b', { style: { fontSize: '20px', color: 'var(--vert)' } }, J.fmt(calc.total))),
+        h('div', { style: { flex: 1 } }, h('div', { class: 'small muted' }, `${cart.lines.length} ligne(s)`), h('b', { style: { fontSize: '20px', color: 'var(--p)' } }, J.fmt(calc.total))),
         h('button', { class: 'btn gold', onclick: () => right.scrollIntoView({ behavior: 'smooth' }) }, 'Voir la fiche')));
     };
 
@@ -400,7 +400,7 @@
       c.note ? h('p', null, c.note) : null,
       h('div', { class: 'grid g3' }, U.kpi('Achats', J.fmt(valid.reduce((a, s) => a + s.total, 0)), `${valid.length} fiche(s)`), U.kpi('Doit', J.fmt(bal), null, bal ? 'red' : ''),
         pts !== null ? U.kpi('Fidélité', `${pts} pt(s)`, `1 pt / ${J.fmt(J.db.settings.loyaltyPer)}`, 'gold') : U.kpi('Dernier achat', valid[0] ? J.fmtDate(valid[0].date) : '—')),
-      h('h3', { style: { margin: '14px 0 8px', fontSize: '15px', color: 'var(--vert)' } }, 'Historique'),
+      h('h3', { style: { margin: '14px 0 8px', fontSize: '15px', color: 'var(--p)' } }, 'Historique'),
       h('div', { class: 'list' }, sales.length ? sales.map((s) => h('div', { class: 'item', onclick: () => A.showSale(s) },
         h('div', { class: 'main' }, h('b', null, s.no === 'SOLDE-OUV' ? "Solde d'ouverture" : s.no), h('small', null, `${J.fmtDate(s.date)} · ${s.lines.map((l) => l.name).join(', ')}`)),
         h('div', { class: 'side-v' }, J.fmt(s.total), h('div', null, h('span', { class: 'tag ' + ({ payee: '', partielle: 'gold', credit: 'red', annulee: 'grey' }[J.payStatus(s)]) }, J.PAY_STATUS_LABEL[J.payStatus(s)]))))) : U.empty('receipt', 'Aucun achat.')));

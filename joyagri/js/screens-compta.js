@@ -102,7 +102,7 @@
       const pay = st.supplierDebts.reduce((a, d) => a + d.amount, 0);
       const cap = assets + stock + treso + rec - pay - st.loans;
       summary.innerHTML = '';
-      summary.appendChild(h('div', { class: 'card', style: { position: 'sticky', bottom: 'calc(var(--nav-h) + 6px)', zIndex: 4, marginTop: '12px', borderColor: 'var(--or)' } },
+      summary.appendChild(h('div', { class: 'card', style: { position: 'sticky', bottom: 'calc(var(--nav-h) + 6px)', zIndex: 4, marginTop: '12px', borderColor: 'var(--a)' } },
         h('div', { class: 'grid g4' }, U.kpi('Immobilisations nettes', J.fmt(assets)), U.kpi('Stock + trésorerie', J.fmt(stock + treso), null, 'blue'), U.kpi('Créances − dettes', J.fmt(rec - pay - st.loans), null, 'red'), U.kpi('Capital (calculé)', J.fmt(cap), 'actif − dettes', 'gold')),
         h('div', { class: 'row end', style: { marginTop: '10px' } }, h('button', { class: 'btn xl gold', onclick: U.safe(validate) }, icon('check'), "Valider le bilan d'ouverture"))));
     };
@@ -222,7 +222,7 @@
     setTimeout(upd, 0);
     U.modal(purchase ? 'Achat d’un équipement (immobilisation)' : 'Bien déjà possédé', h('div', null, f.name, h('div', { class: 'grid g2' }, f.cat, f.qty), h('div', { class: 'grid g2' }, f.cost, f.act),
       h('div', { class: 'grid g2' }, f.date, f.sdate), h('div', { class: 'grid g2' }, f.years, f.res), acc, payBox,
-      h('h3', { style: { fontSize: '15px', margin: '10px 0 6px', color: 'var(--vert)' } }, "Tableau d'amortissement linéaire"), prev),
+      h('h3', { style: { fontSize: '15px', margin: '10px 0 6px', color: 'var(--p)' } }, "Tableau d'amortissement linéaire"), prev),
     [{ label: 'Annuler', cls: 'light' }, { label: 'Enregistrer', icon: 'check', cls: 'gold', click: () => {
       const x = read();
       if (!x.name || !(x.cost > 0) || !(x.lifeMonths > 0)) throw new Error('Désignation, coût et durée de vie obligatoires.');
@@ -272,7 +272,7 @@
         h('p', { class: 'muted' }, `${(J.ASSET_CATEGORIES.find((c) => c.acc === a.acc) || {}).label} · compte ${a.acc} / ${a.dep} · acheté le ${J.fmtDate(a.date)} · mise en service ${J.fmtDate(a.serviceDate || a.date)}`),
         h('div', { class: 'grid g4' }, U.kpi('Coût', J.fmt(a.cost)), U.kpi('Amorti', J.fmt(done), `${Math.round((done / Math.max(1, J.depBase(a))) * 100)} %`, 'gold'), U.kpi('Valeur nette', J.fmt(a.cost - done), null, 'blue'), U.kpi('Dotation', J.fmt(J.monthlyDep(a)), `par mois · ${a.lifeMonths / 12} an(s)`)),
         a.disposal ? h('div', { class: 'alert', style: { marginTop: '10px' } }, icon('alert'), `Sorti le ${J.fmtDate(a.disposal.date)} — prix ${J.fmt(a.disposal.price)}, VNC ${J.fmt(a.disposal.nbv)}, ${a.disposal.gain >= 0 ? 'plus' : 'moins'}-value ${J.fmt(Math.abs(a.disposal.gain))}. ${a.disposal.reason}`) : null,
-        h('h3', { style: { fontSize: '15px', margin: '14px 0 6px', color: 'var(--vert)' } }, "Tableau d'amortissement linéaire"),
+        h('h3', { style: { fontSize: '15px', margin: '14px 0 6px', color: 'var(--p)' } }, "Tableau d'amortissement linéaire"),
         U.table(['Année', { t: 'Mois', n: 1 }, { t: 'Dotation', n: 1 }, { t: 'Cumul', n: 1 }, { t: 'Valeur nette', n: 1 }], rows.map((r) => h('tr', null, U.td(r.year), U.td(r.months, 1), U.td(J.fmt(r.dot, ''), 1), U.td(J.fmt(r.cum, ''), 1), U.td(J.fmt(r.vnc, ''), 1))))),
       [a.disposedMonth ? null : { label: 'Vendre / mettre au rebut', icon: 'x', cls: 'light', click: () => dispose(a) },
         { label: 'Imprimer', icon: 'print', keep: true, click: () => J.print.printHTML(h('div', { class: 'invoice' }, h('h2', null, `Tableau d'amortissement — ${a.name}`), h('p', null, `Coût ${J.fmt(a.cost)} · durée ${a.lifeMonths / 12} an(s) · mise en service ${J.fmtDate(a.serviceDate || a.date)} · linéaire`),
@@ -448,7 +448,16 @@
       J.save(); U.toast('Paramètres enregistrés.', 'ok'); A.render();
     });
     const demoSale = () => ({ no: J.nextSlipNo(), date: J.nowISO(), type: 'vente', status: 'valide', sellerName: A.user.name, client: { name: 'Client de passage' }, lines: [{ kind: 'product', name: 'Test d’impression — Vanille', unit: 'cornet', qty: 2, unitPrice: 5000, priceType: 'detail', gross: 10000, disc: 0, total: 10000 }], gross: 10000, totalDisc: 0, total: 10000, payments: [{ amount: 10000, mode: 'cash', atSale: true, date: J.nowISO() }] });
+    const themeCard = h('div', { class: 'card' }, h('h2', null, 'Apparence — choisissez votre modèle'),
+      h('p', { class: 'muted small' }, 'Touchez un modèle : il s’applique tout de suite sur cet appareil et sur les tickets / factures.'),
+      h('div', { class: 'themes' }, A.THEMES.map((t) => h('button', { class: 'tcard' + ((s.theme || 'ocean') === t.id ? ' on' : ''), 'data-theme': t.id, onclick: () => { s.theme = t.id; J.save(); U.toast(`Modèle « ${t.name} » appliqué.`, 'ok'); A.render(); } },
+        h('div', { class: 'mini' }, h('div', { class: 'mt' }, h('i'), h('b')),
+          t.id === 'royal' ? h('div', { class: 'mh' }, h('span', { class: 'on' }), h('span'), h('span'), h('span')) : null,
+          h('div', { class: 'mb' }, t.id === 'royal' ? null : h('div', { class: 'ms' }, h('span', { class: 'on' }), h('span'), h('span'), h('span'), h('span')),
+            h('div', { class: 'mc' }, h('div'), h('div'), h('div', { class: 'cta' }), h('div'), h('div')))),
+        h('div', { class: 'tx' }, h('b', null, t.name, (s.theme || 'ocean') === t.id ? ' ✓' : ''), h('small', null, t.desc), h('div', { class: 'sw' }, t.sw.map((c) => h('i', { style: { background: c } }))))))));
     return h('div', null, A.title('Paramètres', h('button', { class: 'btn gold', onclick: save }, icon('save'), 'Enregistrer')),
+      themeCard,
       h('div', { class: 'card' }, h('h2', null, 'Entreprise'), h('div', { class: 'row', style: { gap: '16px', alignItems: 'center', marginBottom: '12px' } }, logoImg,
         h('div', { class: 'row' }, h('button', { class: 'btn sm light', onclick: async () => { const d = await U.pickImage(600); if (d) { s.logo = d; logoImg.src = d; J.save(); } } }, icon('image'), 'Changer le logo'), s.logo ? h('button', { class: 'btn sm ghost', onclick: () => { s.logo = null; J.save(); A.render(); } }, 'Logo d’origine') : null)),
         h('div', { class: 'grid g2 stack' }, f.name, f.slogan, f.owner, f.phone), f.address, h('div', { class: 'grid g3 stack' }, f.nif, f.ninu, f.rc)),

@@ -90,9 +90,9 @@
       <div class="hd"><img src="${logo()}" alt=""><div style="flex:1"><h2>${name}</h2><div><i>${e(s.slogan)}</i></div>
         <div>${e(s.address)}</div><div>${s.phone ? 'Tél. : ' + e(s.phone) : ''}</div>
         <div>${s.nif ? 'NIF : ' + e(s.nif) : ''}${s.rc ? ' · Immatriculation : ' + e(s.rc) : ''}</div></div>
-        <div style="text-align:right"><div style="font-size:18px;font-weight:800;color:#1F5E14">FACTURE</div><div>N° <b>${e(sale.no)}</b></div>
+        <div style="text-align:right"><div style="font-size:18px;font-weight:800;color:var(--p)">FACTURE</div><div>N° <b>${e(sale.no)}</b></div>
         <div>${J.fmtDateTime(sale.date)}</div><div>Vendeur : ${e(sale.sellerName || '')}</div></div></div>
-      <div style="margin-top:10px;display:flex;gap:20px"><div style="flex:1;background:#EEF5EA;padding:8px;border-radius:8px">
+      <div style="margin-top:10px;display:flex;gap:20px"><div style="flex:1;background:var(--p-soft);padding:8px;border-radius:8px">
         <small>Client</small><div><b>${e(sale.client.name)}</b></div><div>${e(sale.client.phone || '')}</div><div>${e(sale.client.address || '')}</div></div>
         <div style="flex:1;padding:8px"><small>Paiement</small><div><b>${J.PAY_STATUS_LABEL[J.payStatus(sale)]}</b></div>
         ${(sale.payments || []).map((p) => `<div>${J.fmtDate(p.date)} — ${J.payLabel(p.mode)} : ${J.fmt(p.amount)}</div>`).join('')}
@@ -126,8 +126,8 @@
     const rows = ev.map((x) => { bal += x.deb - x.cr; return `<tr><td>${J.fmtDate(x.d)}</td><td>${e(x.l)}</td><td class="num">${x.deb ? J.fmt(x.deb, '') : ''}</td><td class="num">${x.cr ? J.fmt(x.cr, '') : ''}</td><td class="num"><b>${J.fmt(bal, '')}</b></td></tr>`; }).join('');
     return `<div class="invoice"><div class="hd"><img src="${logo()}" alt=""><div style="flex:1"><h2>${e(s.name).replace(/GRI$/, '<span>GRI</span>')}</h2>
       <div>${e(s.address)}</div><div>${s.phone ? 'Tél. : ' + e(s.phone) : ''}${s.nif ? ' · NIF : ' + e(s.nif) : ''}</div></div>
-      <div style="text-align:right"><div style="font-size:18px;font-weight:800;color:#1F5E14">RELEVÉ DE COMPTE</div><div>au ${J.fmtDate(J.today())}</div></div></div>
-      <div style="margin-top:10px;background:#EEF5EA;padding:8px;border-radius:8px"><b>${e(client.name)}</b> — ${e(client.phone || '')} ${e(client.address || '')}</div>
+      <div style="text-align:right"><div style="font-size:18px;font-weight:800;color:var(--p)">RELEVÉ DE COMPTE</div><div>au ${J.fmtDate(J.today())}</div></div></div>
+      <div style="margin-top:10px;background:var(--p-soft);padding:8px;border-radius:8px"><b>${e(client.name)}</b> — ${e(client.phone || '')} ${e(client.address || '')}</div>
       <table><thead><tr><th>Date</th><th>Opération</th><th class="num">Débit</th><th class="num">Crédit</th><th class="num">Solde</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="tot"><div class="g"><span>MONTANT DÛ</span><span>${J.fmt(bal)}</span></div></div>
       <div class="foot">${e(s.footer || '')}</div></div>`;
@@ -262,12 +262,16 @@
     c.width = W; c.height = L.h;
     const draw = (img) => {
       x.fillStyle = '#fff'; x.fillRect(0, 0, W, L.h);
-      x.fillStyle = '#1F5E14'; x.fillRect(0, 0, W, 8); x.fillStyle = '#C8961E'; x.fillRect(0, L.h - 8, W, 8);
+      const cs = getComputedStyle(document.documentElement);
+      const pc = (cs.getPropertyValue('--p') || '#1D4ED8').trim(); const p2 = (cs.getPropertyValue('--p2') || '#1E40AF').trim();
+      const dark = document.documentElement.dataset.theme === 'nuit';
+      const ink = dark ? '#1E3A8A' : pc;
+      x.fillStyle = ink; x.fillRect(0, 0, W, 8); x.fillStyle = dark ? '#3B82F6' : p2; x.fillRect(0, L.h - 8, W, 8);
       L.ops.forEach((o) => {
         if (o.k === 'logo') { if (img) x.drawImage(img, (W - 140) / 2, o.y, 140, 140); return; }
-        if (o.k === 'hr') { x.strokeStyle = '#A8C9A0'; x.setLineDash([6, 5]); x.beginPath(); x.moveTo(pad, o.y); x.lineTo(W - pad, o.y); x.stroke(); x.setLineDash([]); return; }
+        if (o.k === 'hr') { x.strokeStyle = '#CBD5E1'; x.setLineDash([6, 5]); x.beginPath(); x.moveTo(pad, o.y); x.lineTo(W - pad, o.y); x.stroke(); x.setLineDash([]); return; }
         x.font = o.f;
-        x.fillStyle = o.r.big || (o.r.b && o.k === 'c') ? '#1F5E14' : '#1B2A17';
+        x.fillStyle = o.r.big || (o.r.b && o.k === 'c') ? ink : '#0F172A';
         if (o.k === 'c') { x.textAlign = 'center'; x.fillText(o.t, W / 2, o.y); }
         else if (o.k === 'txt') { x.textAlign = 'left'; x.fillText(o.t, pad, o.y); }
         else { x.textAlign = 'left'; x.fillText(o.a, pad, o.y); x.textAlign = 'right'; x.fillText(o.z, W - pad, o.y); }

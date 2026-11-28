@@ -29,6 +29,7 @@
   /* ---------- Démarrage ---------- */
   A.start = async () => {
     await J.load();
+    A.applyTheme(J.db.settings.theme);
     document.title = J.db.settings.name || 'JOYAGRI';
     try { const id = sessionStorage.getItem('joyagri:user'); if (id) A.user = J.db.users.find((u) => u.id === id && u.active) || null; } catch (e) { /* navigation privée */ }
     window.addEventListener('hashchange', A.render);
@@ -44,7 +45,24 @@
   A.brandName = brandName;
   A.logo = () => J.db.settings.logo || J.LOGO;
 
+  A.THEMES = [
+    { id: 'ocean', name: 'Océan', desc: 'Bleu marine, menu sombre à gauche', sw: ['#0B1B33', '#1D4ED8', '#3B82F6', '#F4F7FB'], meta: '#0B1B33' },
+    { id: 'azur', name: 'Azur', desc: 'Bleu ciel, tout en clair, arrondi', sw: ['#FFFFFF', '#0284C7', '#38BDF8', '#F0F9FF'], meta: '#FFFFFF' },
+    { id: 'nuit', name: 'Nuit', desc: 'Bleu nuit, mode sombre', sw: ['#0A1224', '#101B33', '#3B82F6', '#60A5FA'], meta: '#0A1224' },
+    { id: 'royal', name: 'Royal', desc: 'Bleu royal, menu en haut, style entreprise', sw: ['#172554', '#1E3A8A', '#4338CA', '#F5F6FA'], meta: '#172554' },
+  ];
+  /** Applique le modèle choisi (couleurs + disposition du menu). */
+  A.applyTheme = (id) => {
+    const t = A.THEMES.find((x) => x.id === id) || A.THEMES[0];
+    document.documentElement.dataset.theme = t.id;
+    document.documentElement.dataset.layout = t.id === 'royal' ? 'top' : 'side';
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', t.meta);
+  };
+
   A.render = () => {
+    A.applyTheme(J.db.settings.theme);
+    document.querySelectorAll('.overlay.sheet-ov').forEach((o) => o.remove());
     const app = document.getElementById('app');
     app.innerHTML = '';
     if (!J.db.users.length) { app.appendChild(A.setup()); return; }
@@ -66,7 +84,8 @@
     const bn = (id, label, ic, cls) => h('a', { href: '#/' + id, class: (r === id ? 'on ' : '') + (cls || '') },
       cls === 'sell' ? h('span', { class: 'bubble' }, icon(ic)) : icon(ic), h('span', null, label));
     const bottom = h('nav', { class: 'bottomnav', 'aria-label': 'Navigation' },
-      bn('accueil', 'Accueil', 'home'), bn('fiches', 'Fiches', 'receipt'), bn('vente', 'Vendre', 'cart', 'sell'), bn('clients', 'Clients', 'users'), bn('menu', 'Menu', 'menu'));
+      bn('accueil', 'Accueil', 'home'), bn('fiches', 'Fiches', 'receipt'), bn('vente', 'Vendre', 'cart', 'sell'), bn('clients', 'Clients', 'users'),
+      h('button', { class: 'more', onclick: () => A.sheet(), 'aria-label': 'Plus de fonctions' }, icon('grid'), h('span', null, 'Plus')));
     app.append(top, h('div', { class: 'layout' }, side, main), bottom);
     const screen = A.screens[r] || A.screens.accueil;
     try { const out = screen(main); if (out) main.appendChild(out); } catch (e) { console.error(e); main.appendChild(h('div', { class: 'alert red' }, 'Erreur : ' + e.message)); }
@@ -154,10 +173,27 @@
   A.setUser = (u) => { A.user = u; try { sessionStorage.setItem('joyagri:user', u.id); } catch (e) { /* rien */ } };
   A.logout = () => { J.saveNow(); A.user = null; try { sessionStorage.removeItem('joyagri:user'); } catch (e) { /* rien */ } location.hash = '#/accueil'; A.render(); };
 
-  /* ---------- Menu (téléphone) ---------- */
-  A.screens.menu = () => h('div', null, A.title('Menu'),
-    h('div', { class: 'list' }, NAV.filter((n) => A.allowed(n.id) && n.id !== 'accueil').map((n) => h('a', { class: 'item', href: '#/' + n.id, style: { textDecoration: 'none', color: 'inherit' } },
-      h('span', { class: 'avatar' }, icon(n.icon)), h('div', { class: 'main' }, h('b', null, n.label), h('small', null, n.grp)), icon('back', 'flip')))),
+  /* ---------- Panneau « Plus » : toutes les fonctions en tuiles (téléphone) ---------- */
+  const tiles = (onPick) => {
+    const wrap = h('div');
+    let grp = '';
+    let grid = null;
+    NAV.filter((n) => A.allowed(n.id) && n.id !== 'accueil').forEach((n) => {
+      if (n.grp !== grp) { grp = n.grp; wrap.appendChild(h('h4', null, grp)); grid = h('div', { class: 'tiles' }); wrap.appendChild(grid); }
+      grid.appendChild(h('a', { class: 'tile' + (A.route() === n.id ? ' on' : ''), href: '#/' + n.id, onclick: onPick }, h('span', { class: 'ic' }, icon(n.icon)), n.label));
+    });
+    return wrap;
+  };
+  A.sheet = () => {
+    const close = () => ov.remove();
+    const ov = h('div', { class: 'overlay sheet-ov', onclick: (e) => { if (e.target === ov) close(); } },
+      h('div', { class: 'sheet', role: 'dialog', 'aria-label': 'Toutes les fonctions' }, h('div', { class: 'grab' }),
+        h('div', { class: 'who' }, h('span', { class: 'avatar' }, U.initials(A.user.name)), h('div', { style: { flex: 1 } }, h('b', null, A.user.name), h('small', { class: 'muted' }, J.isOwner(A.user) ? 'Propriétaire' : 'Vendeur')),
+          h('button', { class: 'btn sm light', onclick: () => { close(); A.logout(); } }, icon('logout'), 'Sortir')),
+        tiles(close)));
+    document.body.appendChild(ov);
+  };
+  A.screens.menu = () => h('div', null, A.title('Toutes les fonctions'), h('div', { class: 'card' }, tiles()),
     h('button', { class: 'btn light block', style: { marginTop: '14px' }, onclick: A.logout }, icon('logout'), 'Se déconnecter'));
 
   /* ---------- Tableau de bord ---------- */
@@ -176,11 +212,11 @@
     const tot = parts.reduce((a, p) => a + p.v, 0) || 1;
     let acc = 0;
     const R = 52; const C = 2 * Math.PI * R;
-    const circles = parts.map((p) => { const len = (p.v / tot) * C; const c = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${p.c}" stroke-width="22" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-acc}" transform="rotate(-90 70 70)"/>`; acc += len; return c; }).join('');
-    const svg = h('div', { class: 'donut', html: `<svg viewBox="0 0 140 140" width="140" height="140"><circle r="${R}" cx="70" cy="70" fill="none" stroke="#EEF5EA" stroke-width="22"/>${circles}</svg>` });
+    const circles = parts.map((p) => { const len = (p.v / tot) * C; const c = `<circle r="${R}" cx="70" cy="70" fill="none" style="stroke:${p.c}" stroke-width="22" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-acc}" transform="rotate(-90 70 70)"/>`; acc += len; return c; }).join('');
+    const svg = h('div', { class: 'donut', html: `<svg viewBox="0 0 140 140" width="140" height="140"><circle r="${R}" cx="70" cy="70" fill="none" style="stroke:var(--p-soft)" stroke-width="22"/>${circles}</svg>` });
     return h('div', { class: 'row', style: { gap: '18px', flexWrap: 'nowrap' } }, svg, h('div', { class: 'legend' }, parts.map((p) => h('div', null, h('i', { style: { background: p.c } }), h('span', null, p.l), h('b', { class: 'num', style: { marginLeft: 'auto' } }, `${Math.round((p.v / tot) * 100)} %`)))));
   };
-  A.COLORS = { S: '#C8961E', G: '#1F5E14', D: '#3C8C1E' };
+  A.COLORS = { S: 'var(--c1)', G: 'var(--c2)', D: 'var(--c3)' };
 
   A.screens.accueil = () => {
     const today = J.today();
