@@ -46,9 +46,9 @@
   A.logo = () => J.db.settings.logo || J.LOGO;
 
   A.THEMES = [
-    { id: 'jardin', name: 'Jardin', desc: 'Couleurs du logo, adoucies : vert frais, or miel, blanc', sw: ['#FFFFFF', '#F1F8EC', '#3F8F2E', '#F2B33D', '#8CC9E8'] },
+    { id: 'ciel', name: 'Ciel', desc: 'Bleu pâle et blanc, aéré, touches du logo', sw: ['#F6FAFE', '#E3F0FA', '#8CC9E8', '#3F8F2E', '#F2B33D'] },
+    { id: 'jardin', name: 'Jardin', desc: 'Vert très pâle et blanc, couleurs du logo adoucies', sw: ['#FFFFFF', '#F1F8EC', '#6DB33F', '#F2B33D', '#8CC9E8'] },
     { id: 'soleil', name: 'Soleil', desc: 'Jaune très pâle et chaleureux, touches de vert', sw: ['#FFFCF2', '#FFF1C7', '#F2B33D', '#3F8F2E', '#FFFFFF'] },
-    { id: 'ciel', name: 'Ciel', desc: 'Bleu pâle et blanc, aéré, boutons arrondis', sw: ['#F6FAFE', '#E3F0FA', '#8CC9E8', '#3F8F2E', '#F2B33D'] },
   ];
   /** Applique le modèle choisi (couleurs) et la position du menu. */
   A.applyTheme = (id) => {
@@ -77,7 +77,7 @@
     let grp = '';
     NAV.filter((n) => A.allowed(n.id)).forEach((n) => {
       if (n.grp !== grp) { grp = n.grp; side.appendChild(h('div', { class: 'grp' }, grp)); }
-      side.appendChild(h('a', { href: '#/' + n.id, class: r === n.id ? 'on' : '' }, icon(n.icon), n.label));
+      side.appendChild(h('a', { href: '#/' + n.id, class: (r === n.id ? 'on ' : '') + 'g' + ['Ventes', 'Argent', 'Gestion', 'Pilotage', 'Système'].indexOf(n.grp) }, h('span', { class: 'ib' }, icon(n.icon)), n.label));
     });
     const main = h('main', { id: 'main' });
     const bn = (id, label, ic, cls) => h('a', { href: '#/' + id, class: (r === id ? 'on ' : '') + (cls || '') },
@@ -103,7 +103,7 @@
       h('div', { class: 'ring' }, h('img', { src: A.logo(), alt: 'Logo ' + (s.name || '') })),
       h('h1', null, brandName(s.name)),
       s.slogan ? h('div', { class: 'slogan' }, s.slogan) : null,
-      h('div', { class: 'chips' }, h('span', null, icon('tractor'), 'Services agricoles'), h('span', null, icon('icecream'), 'Crème glacée'), h('span', null, icon('chart'), 'Comptabilité')),
+      h('div', { class: 'chips' }, h('span', null, icon('tractor'), 'Services agricoles'), h('span', null, icon('icecream'), 'Crème glacée')),
       h('div', { class: 'wave', html: '<svg viewBox="0 0 1440 120" preserveAspectRatio="none" width="100%" height="100%"><path d="M0 64 C 240 120 480 0 720 40 C 960 80 1200 120 1440 60 L1440 120 L0 120 Z" fill="var(--fond)"/></svg>' }));
     return h('div', { class: 'auth' }, hero, h('section', { class: 'auth-panel' }, h('div', { class: 'auth-card' + (wide ? ' wide' : '') }, content)));
   };
@@ -129,12 +129,11 @@
       J.audit(u, 'Installation', 'Compte propriétaire créé');
       J.saveNow();
       A.setUser(u);
-      U.toast('Bienvenue ! Commencez par le bilan d’ouverture puis le catalogue.', 'ok');
       A.go('accueil');
     });
     const importBtn = h('button', { class: 'btn light block', onclick: () => A.importFile() }, icon('upload'), 'Restaurer une sauvegarde ou un profil');
     return A.authShell([
-      h('div', { class: 'hello' }, 'Bienvenue 👋'), h('div', { class: 'sub' }, 'Installons votre espace en deux étapes.'),
+      h('div', { class: 'hello' }, 'Installation'), h('div', { class: 'sub' }, 'Votre entreprise, puis votre compte.'),
       h('div', { class: 'card' }, h('h2', null, '1. Votre entreprise'),
         h('div', { class: 'grid g2 stack' }, f.name, f.slogan, f.owner, f.phone), f.address,
         h('div', { class: 'grid g3 stack' }, f.nif, f.ninu, f.rc)),
@@ -148,43 +147,39 @@
   /* ---------- Connexion ---------- */
   const tries = { n: 0, until: 0 };
   A.login = () => {
-    const users = J.db.users.filter((u) => u.active);
-    let sel = users.length === 1 ? users[0] : null;
+    const user = h('input', { type: 'text', class: 'inp', placeholder: "Nom d'utilisateur", autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false' });
     const pw = h('input', { type: 'password', class: 'inp', placeholder: 'Mot de passe', autocomplete: 'current-password' });
-    const msg = h('div', { class: 'small red', style: { minHeight: '20px', margin: '6px 0' } });
-    const grid = h('div', { class: 'users' });
-    const draw = () => {
-      grid.innerHTML = '';
-      users.forEach((u) => grid.appendChild(h('button', { class: sel === u ? 'on' : '', onclick: () => { sel = u; draw(); pw.focus(); } },
-        h('span', { class: 'avatar ' + (u.role === 'owner' ? 'gold' : '') }, U.initials(u.name)), u.name,
-        h('span', { class: 'tag ' + (u.role === 'owner' ? 'gold' : '') }, u.role === 'owner' ? 'Propriétaire' : 'Vendeur'))));
-    };
-    draw();
+    const msg = h('div', { class: 'small red', style: { minHeight: '20px', margin: '6px 0' }, role: 'alert' });
     const go = () => {
       if (Date.now() < tries.until) { msg.textContent = `Trop d'essais. Patientez ${Math.ceil((tries.until - Date.now()) / 1000)} s.`; return; }
-      if (!sel) { msg.textContent = 'Choisissez votre nom.'; return; }
-      if (!J.checkPassword(sel, pw.value)) {
+      const login = user.value.trim().toLowerCase();
+      if (!login || !pw.value) { msg.textContent = "Entrez votre nom d'utilisateur et votre mot de passe."; return; }
+      const u = J.db.users.find((x) => x.active && x.login.toLowerCase() === login);
+      if (!u || !J.checkPassword(u, pw.value)) {
         tries.n++;
         // Pas d'essais en boucle : après 5 erreurs, attente obligatoire
         if (tries.n >= 5) { tries.until = Date.now() + 30000; tries.n = 0; }
-        msg.textContent = 'Mot de passe incorrect.'; pw.value = ''; pw.focus(); return;
+        msg.textContent = "Nom d'utilisateur ou mot de passe incorrect."; pw.value = ''; pw.focus(); return;
       }
       tries.n = 0;
-      A.setUser(sel);
-      J.audit(sel, 'Connexion');
+      A.setUser(u);
+      J.audit(u, 'Connexion');
       J.save();
       A.go(A.route() === 'menu' ? 'accueil' : A.route());
     };
+    user.addEventListener('keydown', (e) => { if (e.key === 'Enter') pw.focus(); });
     pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-    const s = J.db.settings;
-    setTimeout(() => sel && pw.focus(), 50);
+    setTimeout(() => user.focus(), 50);
     const eye = h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Afficher le mot de passe', onclick: () => { pw.type = pw.type === 'password' ? 'text' : 'password'; } }, icon('eye'));
+    const forgot = h('button', { class: 'linkbtn', type: 'button', onclick: () => U.modal('Mot de passe oublié', h('p', null, 'Demandez au propriétaire : il peut vous donner un nouveau mot de passe depuis « Utilisateurs », sans avoir besoin de l’ancien.'), [{ label: 'Compris' }]) }, 'Mot de passe oublié ?');
     return A.authShell([
       h('div', { class: 'hello' }, `${greeting()} !`),
       h('div', { class: 'sub' }, new Intl.DateTimeFormat('fr-FR', { timeZone: J.TZ, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())),
-      h('div', { class: 'card' }, h('h2', null, 'Qui êtes-vous ?'), grid, h('div', { class: 'pwbox' }, pw, eye), msg,
-        h('button', { class: 'btn gold xl block', onclick: go }, icon('lock'), 'Se connecter')),
-      h('p', { class: 'foot' }, 'Mot de passe oublié ? Le propriétaire peut en donner un nouveau dans « Utilisateurs ».', h('br'), `${s.name} · ${s.slogan || ''}`)]);
+      h('div', { class: 'card' },
+        h('div', { class: 'ibox' }, icon('user'), user),
+        h('div', { class: 'ibox pwbox' }, icon('lock'), pw, eye), msg,
+        h('button', { class: 'btn gold xl block', onclick: go }, 'Se connecter'),
+        h('div', { style: { textAlign: 'center', marginTop: '12px' } }, forgot))]);
   };
   A.setUser = (u) => { A.user = u; try { sessionStorage.setItem('joyagri:user', u.id); } catch (e) { /* rien */ } };
   A.logout = () => { document.querySelectorAll('.toast').forEach((t) => t.remove()); J.saveNow(); A.user = null; try { sessionStorage.removeItem('joyagri:user'); } catch (e) { /* rien */ } location.hash = '#/accueil'; A.render(); };
@@ -213,16 +208,23 @@
     h('button', { class: 'btn light block', style: { marginTop: '14px' }, onclick: A.logout }, icon('logout'), 'Se déconnecter'));
 
   /* ---------- Tableau de bord ---------- */
+  /** 12500 HTG → « 12,5k » pour les étiquettes de graphique */
+  const short = (c) => { const v = c / 100; if (v >= 1e6) return (v / 1e6).toFixed(1).replace('.', ',') + 'M'; if (v >= 1000) return (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace('.', ',') + 'k'; return String(Math.round(v)); };
   A.bars = (byDay, from, days) => {
     const keys = []; for (let i = 0; i < days; i++) keys.push(J.addDays(from, i));
     const max = Math.max(1, ...keys.map((k) => byDay[k] || 0));
-    return h('div', { class: 'bars', role: 'img', 'aria-label': 'Ventes par jour' }, keys.map((k) => h('div', { class: 'b', title: `${J.fmtDate(k)} : ${J.fmt(byDay[k] || 0)}` },
-      h('i', { style: { height: `${Math.round(((byDay[k] || 0) / max) * 100)}%` } }), h('span', null, k.slice(8) + '/' + k.slice(5, 7)))));
+    const many = days > 14;
+    return h('div', { class: 'bars' + (many ? ' many' : ''), role: 'img', 'aria-label': 'Ventes par jour' }, keys.map((k, i) => {
+      const v = byDay[k] || 0;
+      return h('div', { class: 'b c' + (i % 4), title: `${J.fmtDate(k)} : ${J.fmt(v)}` },
+        !many && v ? h('em', null, short(v)) : null,
+        h('i', { style: { height: `${Math.max(v ? 4 : 1, Math.round((v / max) * 100))}%` } }), h('span', null, !many || i % 5 === 0 || i === days - 1 ? k.slice(8) + '/' + k.slice(5, 7) : '\u00a0'));
+    }));
   };
   A.hbars = (rows, cls, fmtFn) => {
     const max = Math.max(1, ...rows.map((r) => r.amount));
-    return h('div', null, rows.map((r) => h('div', { class: 'hbar' }, h('span', null, r.name), h('b', { class: 'num' }, (fmtFn || J.fmt)(r.amount)),
-      h('div', { class: 'track' }, h('i', { class: cls || '', style: { width: `${Math.max(2, (r.amount / max) * 100)}%` } })))));
+    return h('div', null, rows.map((r, i) => h('div', { class: 'hbar' }, h('span', null, r.name), h('b', { class: 'num' }, (fmtFn || J.fmt)(r.amount)),
+      h('div', { class: 'track' }, h('i', { class: 'c' + (i % 4), style: { width: `${Math.max(2, (r.amount / max) * 100)}%` } })))));
   };
   A.donut = (parts) => {
     const tot = parts.reduce((a, p) => a + p.v, 0) || 1;
@@ -256,7 +258,7 @@
     const wk = J.salesReport(week0, today);
     return h('div', null,
       h('div', { class: 'page-title' }, h('div', null, h('h1', null, `${hello}, ${A.user.name.split(' ')[0]}`), h('div', { class: 'muted' }, new Intl.DateTimeFormat('fr-FR', { timeZone: J.TZ, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date()))),
-        h('a', { class: 'btn gold xl', href: '#/vente' }, icon('cart'), 'Nouvelle vente')),
+        h('a', { class: 'btn soft', href: '#/vente' }, icon('cart'), 'Nouvelle vente')),
       h('div', { class: 'grid g4' },
         U.kpi("Ventes aujourd'hui", J.fmt(r.total), `${r.count} fiche(s)`),
         U.kpi('Encaissé aujourd’hui', J.fmt(r.collected), 'ventes + crédits', 'blue'),

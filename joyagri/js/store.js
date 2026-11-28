@@ -13,7 +13,7 @@
       address: '', phone: '', footer: 'Merci pour votre achat !', slipPrefix: 'F', nextSlipNo: 1,
       purchasePrefix: 'A', nextPurchaseNo: 1, usdEnabled: false, usdRate: 0, ticketWidth: 58,
       sellerMaxDiscountPct: 10, allowNegativeStock: false, printMode: 'escpos', escposAccents: 'ascii', escposLogo: true, escposCut: false, printerModel: 'PT-210', logo: null,
-      sellerCanDeclareLoss: false, theme: 'jardin', menuTop: false, creditDefaultDays: 15, loyaltyEnabled: true, loyaltyPer: 100000,
+      sellerCanDeclareLoss: false, theme: 'ciel', menuTop: false, creditDefaultDays: 15, loyaltyEnabled: true, loyaltyPer: 100000,
     },
     users: [], clients: [], products: [], services: [], suppliers: [],
     sales: [], purchases: [], supplierPayments: [], stockMoves: [], expenses: [],
