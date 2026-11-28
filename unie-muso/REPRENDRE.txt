@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.7.5 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.7.6 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -132,6 +132,10 @@ POINTS TECHNIQUES IMPORTANTS
   déconnexion), attend 30 min après un blocage (ONLINE.blockedUntil), réessaie 20 s seulement pour
   un problème réseau. Mise à jour des comptes : 3 anciens mots de passe max, 0,7 s entre essais,
   arrêt immédiat si Firebase bloque.
+- 3.7.6 : changement de mot de passe sans manipulation. Côté trésorier : file st.pendingPwd,
+  traitée immédiatement si en ligne, sinon automatiquement au retour en ligne (processPendingPwds).
+  Côté membre : mot de passe refusé -> fenêtre « Nouveau mot de passe » (askNewPassword, 3 essais
+  max), sans déconnexion ; aussi en touchant « ! Problème en ligne ».
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer

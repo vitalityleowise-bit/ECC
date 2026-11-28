@@ -42,7 +42,44 @@ function netStatusHTML() {
   const S = { off: ['○', 'Hors ligne', 'b-grey'], connecting: ['⟳', 'Connexion…', 'b-orange'], sync: ['⟳', 'Synchronisation…', 'b-orange'], ok: ['●', 'En ligne', 'b-green'], err: ['!', 'Problème en ligne', 'b-red'] }[ONLINE.status] || ['○', 'Hors ligne', 'b-grey'];
   return '<button id="net-status" class="badge ' + S[2] + ' net-status" data-act="netInfo" title="' + esc(ONLINE.detail || S[1]) + '">' + S[0] + ' ' + S[1] + '</button>';
 }
+/* Mot de passe refusé en ligne (changé par le trésorier) : on demande le nouveau, une seule fois */
+function maybeAskPwd() {
+  clearTimeout(ONLINE.askTimer);
+  if (!ONLINE.badPwd || !SESSION) return;
+  if (document.getElementById('modal') || document.querySelector('.welcome')) { ONLINE.askTimer = setTimeout(maybeAskPwd, 2500); return; }
+  askNewPassword();
+}
+function askNewPassword() {
+  if (!SESSION) return;
+  const id = SESSION.type === 'member' ? SESSION.code : SESSION.id;
+  let tries = 0;
+  openModal({
+    title: 'Nouveau mot de passe', submit: 'Valider',
+    body: '<p style="margin:0 0 12px">Votre mot de passe a été changé par le trésorier. Entrez le <b>nouveau</b> mot de passe pour continuer en ligne. Vos données restent sur ce téléphone.</p>' +
+      field('Nouveau mot de passe', '<input name="np" id="np" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" required>') +
+      '<div id="np-msg" class="muted" style="font-size:12.5px;margin-top:6px"></div>',
+    onSubmit: (v) => {
+      const pwd = (v.np || '').trim(); const msg = document.getElementById('np-msg');
+      if (!pwd) { msg.textContent = 'Entrez le mot de passe.'; return false; }
+      msg.textContent = 'Vérification…'; initOnline();
+      ONLINE.auth.signInWithEmailAndPassword(fbEmail(id), fbPwd(pwd)).then(() => {
+        if (SESSION.type === 'member') { const m = getMember(SESSION.code); if (m) { m.portal_password = pwd; store.set(KEYS.db, DB); } }
+        else if (USERS[SESSION.id]) { USERS[SESSION.id].pwd = pwd; saveUsers(); }
+        ONLINE.badPwd = false; closeModal(); toast('Mot de passe mis à jour. Connexion en ligne…', 'ok'); goOnline(true);
+      }).catch((e) => {
+        const c = (e && e.code) || '';
+        if (/too-many-requests/.test(c)) { ONLINE.blockedUntil = Date.now() + 30 * 60000; closeModal(); setOnlineStatus('err', errText(e)); return; }
+        if (/network|unavailable/.test(c)) { msg.textContent = 'Pas d’Internet pour le moment. Réessayez quand la connexion revient.'; return; }
+        tries++;
+        if (tries >= 3) { closeModal(); toast('Mot de passe toujours refusé. Demandez le bon mot de passe au trésorier, puis touchez « ! Problème en ligne » en haut de l’écran.', 'err'); return; }
+        msg.textContent = 'Mot de passe incorrect (' + tries + ' / 3). Vérifiez avec le trésorier.';
+      });
+      return false;
+    },
+  });
+}
 ACTIONS.netInfo = () => {
+  if (ONLINE.badPwd && SESSION) { askNewPassword(); return; }
   const last = ONLINE.lastSync ? ' Dernière synchronisation : ' + fmtDT(new Date(ONLINE.lastSync).toISOString()) + '.' : '';
   toast((ONLINE.detail || { off: 'Hors ligne : vos changements sont gardés et seront envoyés au retour d’Internet.', ok: 'En ligne : tout est synchronisé.' }[ONLINE.status] || '') + last, ONLINE.status === 'err' ? 'err' : 'ok');
   if (isAdmin()) { STATE.ptab = 'enligne'; go('parametres'); }
@@ -72,10 +109,10 @@ function errText(e) {
   const c = (e && e.code) || '';
   if (/permission-denied/.test(c)) return 'Accès refusé par le serveur (règles de sécurité non installées, ou compte en ligne pas encore créé par le trésorier).';
   if (/invalid-credential|wrong-password|invalid-login|user-not-found/.test(c)) {
-    if (SESSION && SESSION.type === 'member') return 'Mot de passe refusé en ligne. Si le trésorier a changé votre mot de passe : touchez « Déconnexion », puis entrez le NOUVEAU mot de passe. Sinon, le trésorier doit cliquer « Créer / mettre à jour les comptes » (Paramètres > En ligne).';
+    if (SESSION && SESSION.type === 'member') return 'Votre mot de passe a changé : touchez « ! Problème en ligne » en haut de l’écran et entrez le NOUVEAU mot de passe donné par le trésorier.';
     return 'Compte en ligne introuvable ou mot de passe différent : le trésorier doit créer ou mettre à jour les comptes en ligne (Paramètres > En ligne).';
   }
-  if (/too-many-requests/.test(c)) return 'Firebase bloque cet appareil pour un moment : trop d’essais avec un mauvais mot de passe. N’essayez plus pendant 30 minutes ; l’application réessaiera seule. Si le trésorier a changé votre mot de passe : « Déconnexion », puis entrez le NOUVEAU mot de passe après ce délai.';
+  if (/too-many-requests/.test(c)) return 'Firebase bloque cet appareil pour un moment : trop d’essais avec un mauvais mot de passe. N’essayez plus pendant 30 minutes ; l’application réessaiera seule. Ensuite, touchez « ! Problème en ligne » et entrez le NOUVEAU mot de passe.';
   if (/network|unavailable|deadline/.test(c)) return 'Connexion Internet instable : nouvel essai automatique dans 20 secondes (' + c + ').';
   return ((e && e.message) || String(e)) + (c ? ' (' + c + ')' : '');
 }
@@ -109,13 +146,14 @@ async function goOnline(manual) {
     ONLINE.lastSync = Date.now();
     setOnlineStatus('ok', 'En ligne : tout est synchronisé.');
     touchSeen(true);
+    processPendingPwds(false);
   } catch (e) {
     setOnlineStatus('err', errText(e));
     // Nouvel essai automatique SEULEMENT pour un problème de réseau. Un mauvais mot de passe essayé
     // encore et encore fait bloquer l'appareil (et toute la connexion partagée) par Firebase.
     const c = (e && e.code) || '';
     if (/too-many-requests/.test(c)) { ONLINE.blockedUntil = Date.now() + 30 * 60000; ONLINE.retry = setTimeout(goOnline, 30 * 60000); }
-    else if (/invalid-credential|wrong-password|invalid-login|user-not-found|user-disabled/.test(c)) { ONLINE.badPwd = true; }
+    else if (/invalid-credential|wrong-password|invalid-login|user-not-found|user-disabled/.test(c)) { ONLINE.badPwd = true; maybeAskPwd(); }
     else ONLINE.retry = setTimeout(goOnline, 20000);
   }
 }
@@ -369,6 +407,7 @@ async function syncMemberAccounts(onProgress) {
       await auth2.signOut().catch(() => {});
       await ONLINE.fs.collection('roles').doc(uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) });
       m.uid = uid;
+      { const st2 = pwdMemory(); if (st2.pendingPwd) delete st2.pendingPwd[m.code]; }
     } catch (e) {
       await auth2.signOut().catch(() => {});
       if (/too-many-requests/.test(e.code || '')) { res.erreurs.push('Firebase bloque les essais pour un moment (trop d’essais). Attendez 30 minutes, puis cliquez à nouveau : les comptes déjà faits ne sont pas refaits.'); break; }
@@ -422,15 +461,35 @@ function memberPasswordChanged(code, oldPwd, newPwd) {
   if (!isAdmin()) return;
   rememberOldPwd(code, oldPwd);
   const m = getMember(code); if (!m || !m.uid || !newPwd) return;
-  if (!ONLINE.who) { toast('Mot de passe enregistré. Le compte en ligne sera mis à jour au prochain « Créer / mettre à jour les comptes » (Paramètres > En ligne).', 'warn'); return; }
-  const auth2 = secondaryAuth();
-  signInMemberAccount(auth2, m).then(() => auth2.signOut().catch(() => {}))
-    .then(() => toast('Compte en ligne de ' + code + ' mis à jour.', 'ok'))
-    .catch((e) => {
-      auth2.signOut().catch(() => {});
-      if (/network|unavailable/.test(e.code || '')) toast('Mot de passe enregistré. Pas d’Internet : le compte en ligne de ' + code + ' sera mis à jour au prochain « Créer / mettre à jour les comptes » (Paramètres > En ligne).', 'warn');
-      else toast(e.code === 'unie/old-password-unknown' ? e.message : 'Compte en ligne de ' + code + ' non mis à jour : ' + errText(e), 'err');
-    });
+  const st = pwdMemory(); st.pendingPwd = st.pendingPwd || {}; st.pendingPwd[code] = true; saveSyncState();
+  if (!ONLINE.who) { toast('Mot de passe enregistré. Le compte en ligne de ' + code + ' sera mis à jour tout seul dès le retour d’Internet.', 'ok'); return; }
+  processPendingPwds(true);
+}
+/* Comptes en ligne dont le mot de passe attend d'être changé : traités dès que le trésorier est en ligne */
+async function processPendingPwds(verbose) {
+  if (!isAdmin() || !ONLINE.who || ONLINE.pwdBusy) return;
+  const st = pwdMemory(); const codes = Object.keys(st.pendingPwd || {});
+  if (!codes.length) return;
+  ONLINE.pwdBusy = true; const auth2 = secondaryAuth(); const done = []; let problem = '';
+  try {
+    for (const code of codes) {
+      const m = getMember(code);
+      if (!m || !m.uid || !m.portal_password || m.statut === 'Inactif') { delete st.pendingPwd[code]; continue; }
+      try { await signInMemberAccount(auth2, m); await auth2.signOut().catch(() => {}); delete st.pendingPwd[code]; done.push(code); }
+      catch (e) {
+        await auth2.signOut().catch(() => {});
+        const c = e.code || '';
+        if (/network|unavailable/.test(c)) break; // on réessaiera au prochain retour en ligne
+        if (/too-many-requests/.test(c)) { problem = 'Firebase demande d’attendre un peu : les mots de passe restants seront mis à jour automatiquement plus tard.'; break; }
+        if (c === 'unie/old-password-unknown') { delete st.pendingPwd[code]; problem = e.message; continue; }
+        problem = code + ' : ' + errText(e);
+      }
+      await new Promise((r) => setTimeout(r, 800));
+    }
+  } finally { ONLINE.pwdBusy = false; saveSyncState(); }
+  if (done.length && (verbose || problem)) toast('Compte(s) en ligne mis à jour : ' + done.join(', ') + '.', 'ok');
+  else if (done.length) toast('Mots de passe en ligne mis à jour : ' + done.join(', ') + '.', 'ok');
+  if (problem) toast(problem, 'err');
 }
 
 /* ---------- Connexion sur un appareil sans données (lien en ligne, iPhone) ---------- */
