@@ -68,7 +68,7 @@ function askNewPassword() {
   let tries = 0;
   openModal({
     title: 'Mot de passe', submit: 'Valider',
-    body: '<p style="margin:0 0 12px">Entrez le mot de passe que le trésorier vous a donné pour continuer en ligne. Vos données restent sur ce téléphone.</p>' +
+    body: '<p style="margin:0 0 12px">' + (SESSION.type === 'user' ? 'Entrez le mot de passe <b>admin</b> du compte trésorier en ligne : le même que sur l’autre appareil (PC ou téléphone) où il marche. Il deviendra aussi celui de cet appareil.' : 'Entrez le mot de passe que le trésorier vous a donné pour continuer en ligne. Vos données restent sur ce téléphone.') + '</p>' +
       field('Mot de passe', '<div style="display:flex;gap:6px"><input name="np" id="np" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" required style="flex:1;min-width:0">' +
         '<button type="button" class="btn" onclick="var i=document.getElementById(\'np\');i.type=i.type===\'password\'?\'text\':\'password\';this.textContent=i.type===\'password\'?\'Voir\':\'Cacher\'">Voir</button></div>') +
       '<div id="np-msg" class="muted" style="font-size:12.5px;margin-top:6px"></div>',
@@ -124,7 +124,7 @@ function errText(e) {
   if (/permission-denied/.test(c)) return 'Accès refusé par le serveur (règles de sécurité non installées, ou compte en ligne pas encore créé par le trésorier).';
   if (/invalid-credential|wrong-password|invalid-login|user-not-found/.test(c)) {
     if (SESSION && SESSION.type === 'member') return 'Mot de passe refusé en ligne : touchez « ! Problème en ligne » en haut de l’écran et entrez le mot de passe donné par le trésorier.';
-    return 'Compte en ligne introuvable ou mot de passe différent.';
+    return 'Le mot de passe « admin » de cet appareil n’est pas celui du compte trésorier en ligne (créé sur l’autre appareil). Touchez « ! Problème en ligne » et entrez le mot de passe admin de l’autre appareil.';
   }
   if (/too-many-requests/.test(c)) return 'Firebase bloque cet appareil pour un moment : trop d’essais avec un mauvais mot de passe. N’essayez plus pendant 30 minutes ; l’application réessaiera seule. Ensuite, touchez « ! Problème en ligne » et entrez le NOUVEAU mot de passe.';
   if (/network|unavailable|deadline/.test(c)) return 'Connexion Internet instable : nouvel essai automatique dans 20 secondes (' + c + ').';
@@ -162,11 +162,19 @@ async function goOnline(manual) {
       try { await ONLINE.auth.signInWithEmailAndPassword(cred.email, fbPwd(cred.pwd)); } catch (e) {
         // Première connexion du trésorier : son compte en ligne est créé automatiquement
         if (SESSION.type === 'user' && SESSION.id === 'admin' && /user-not-found|invalid-credential|invalid-login/.test(e.code || '')) {
-          await ONLINE.auth.createUserWithEmailAndPassword(cred.email, fbPwd(cred.pwd));
+          try { await ONLINE.auth.createUserWithEmailAndPassword(cred.email, fbPwd(cred.pwd)); } catch (e2) {
+            // Le compte trésorier existe déjà (créé sur un autre appareil) : le mot de passe de CET appareil est différent
+            if (/email-already-in-use/.test(e2.code || '')) { const e3 = new Error('admin password differs'); e3.code = 'auth/invalid-credential'; throw e3; }
+            throw e2;
+          }
         } else throw e;
       }
     }
     if (ONLINE.who !== key) { stopListeners(); ONLINE.who = key; startListeners(); }
+    // Appareil jamais synchronisé (ou liste jamais reçue) : d'abord recevoir le serveur, sinon ses données
+    // anciennes remplaceraient celles des autres appareils
+    const st0 = syncState();
+    if (SHARED_ARRAYS.concat(SHARED_CFG).some((n) => st0.arrays[n] === undefined)) onRemoteDb(await ONLINE.fs.collection('db').get());
     await pushAll();
     ONLINE.lastSync = Date.now();
     setOnlineStatus('ok', 'En ligne : tout est synchronisé.');
@@ -302,7 +310,8 @@ function onRemoteDb(snap) {
     const localChanged = hashStr(JSON.stringify(sharedValue(name))) !== st.arrays[name];
     // Conflit entre les deux personnes autorisées : la modification la plus récente gagne.
     // Pour les autres membres, le serveur a toujours raison.
-    if (isOnlineEditor() && localChanged && (st.changedAt[name] || 0) > (meta.updated_at || 0)) continue;
+    // (jamais pour une liste que cet appareil n'a encore jamais reçue : le serveur gagne)
+    if (isOnlineEditor() && localChanged && st.arrays[name] !== undefined && (st.changedAt[name] || 0) > (meta.updated_at || 0)) continue;
     try { applySharedValue(name, JSON.parse(s)); } catch (_e) { continue; }
     st.arrays[name] = meta.hash; st.parts[name] = meta.parts; delete st.changedAt[name]; changed = true;
   }

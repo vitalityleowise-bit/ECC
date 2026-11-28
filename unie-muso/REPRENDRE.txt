@@ -1,6 +1,6 @@
 UNIE-MUSO — FICHE DE REPRISE (pour continuer le travail dans une nouvelle conversation)
 =====================================================================================
-Version actuelle : 3.8.1 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
+Version actuelle : 3.8.2 (APK et Windows) — 27/11/2026. Ce fichier ne contient AUCUNE donnée de membre.
 
 COMMENT REPRENDRE DANS UNE NOUVELLE CONVERSATION
 ------------------------------------------------
@@ -144,6 +144,9 @@ POINTS TECHNIQUES IMPORTANTS
   compte. Aucun mot de passe par défaut ; build.js vide portal_password du fichier installé ;
   bouton « Effacer tous les mots de passe des membres » (Accès portail). Membre sans rôle
   (permission-denied) -> fenêtre « Mot de passe » (accessRemoved). Admin : admin@uniemuso.app inchangé.
+- 3.8.2 : appareil jamais synchronisé -> il REÇOIT d'abord le serveur (get de « db » avant pushAll ;
+  onRemoteDb : le serveur gagne pour une liste jamais reçue). Mot de passe admin différent du compte
+  en ligne (email-already-in-use) -> fenêtre « Mot de passe » qui l'aligne. APP_VERSION à jour.
 - Rôles : admin (trésorier), éditeur (un membre du comité choisi dans Paramètres,
   Présidente par défaut), comité, membre. Seuls admin et éditeur modifient.
 - En ligne : comptes « code@uniemuso.app », admin « admin@uniemuso.app » ; refus de passer

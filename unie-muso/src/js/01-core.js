@@ -2,7 +2,7 @@
 /* =========================================================================
    UNIE-MUSO — noyau : stockage, données de départ, utilitaires
    ========================================================================= */
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.8.2';
 const KEYS = {
   db: 'uniemuso-data-v2',
   users: 'uniemuso-users-v1',
