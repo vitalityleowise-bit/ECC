@@ -1,0 +1,23 @@
+{
+  "name": "joyagri",
+  "version": "1.0.0",
+  "description": "JOYAGRI — ventes, stock et comptabilité (services agricoles et crème glacée), hors ligne",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "test": "node tests/core.test.js && node tests/store.test.js && node tests/amortissement.test.js",
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "ht.joyagri.app",
+    "productName": "JOYAGRI",
+    "files": ["index.html", "css/**", "js/**", "assets/**", "electron/**"],
+    "win": { "target": "nsis", "icon": "assets/icon-512.png" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "shortcutName": "JOYAGRI" }
+  }
+}

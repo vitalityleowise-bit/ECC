@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.apk
+*.keystore
+# données réelles : ne jamais publier
+sauvegardes/
+*-sauvegarde-*.json
+profil-entreprise*.json
