@@ -75,11 +75,14 @@ function errText(e) {
     if (SESSION && SESSION.type === 'member') return 'Mot de passe refusé en ligne. Si le trésorier a changé votre mot de passe : touchez « Déconnexion », puis entrez le NOUVEAU mot de passe. Sinon, le trésorier doit cliquer « Créer / mettre à jour les comptes » (Paramètres > En ligne).';
     return 'Compte en ligne introuvable ou mot de passe différent : le trésorier doit créer ou mettre à jour les comptes en ligne (Paramètres > En ligne).';
   }
+  if (/too-many-requests/.test(c)) return 'Firebase bloque cet appareil pour un moment : trop d’essais avec un mauvais mot de passe. N’essayez plus pendant 30 minutes ; l’application réessaiera seule. Si le trésorier a changé votre mot de passe : « Déconnexion », puis entrez le NOUVEAU mot de passe après ce délai.';
   if (/network|unavailable|deadline/.test(c)) return 'Connexion Internet instable : nouvel essai automatique dans 20 secondes (' + c + ').';
   return ((e && e.message) || String(e)) + (c ? ' (' + c + ')' : '');
 }
-async function goOnline() {
+async function goOnline(manual) {
   clearTimeout(ONLINE.retry);
+  if (manual !== true && ONLINE.blockedUntil && Date.now() < ONLINE.blockedUntil) return;
+  if (manual !== true && ONLINE.badPwd) return; // mot de passe refusé : on attend une nouvelle connexion de la personne
   if (!SESSION || !onlineAvailable()) { setOnlineStatus('off'); return; }
   if (!navigator.onLine) { setOnlineStatus('off', 'Hors ligne : vos changements sont gardés et seront envoyés au retour d’Internet.'); return; }
   initOnline();
@@ -108,7 +111,12 @@ async function goOnline() {
     touchSeen(true);
   } catch (e) {
     setOnlineStatus('err', errText(e));
-    ONLINE.retry = setTimeout(goOnline, 20000);
+    // Nouvel essai automatique SEULEMENT pour un problème de réseau. Un mauvais mot de passe essayé
+    // encore et encore fait bloquer l'appareil (et toute la connexion partagée) par Firebase.
+    const c = (e && e.code) || '';
+    if (/too-many-requests/.test(c)) { ONLINE.blockedUntil = Date.now() + 30 * 60000; ONLINE.retry = setTimeout(goOnline, 30 * 60000); }
+    else if (/invalid-credential|wrong-password|invalid-login|user-not-found|user-disabled/.test(c)) { ONLINE.badPwd = true; }
+    else ONLINE.retry = setTimeout(goOnline, 20000);
   }
 }
 function goOffline() { stopListeners(); ONLINE.who = ''; if (ONLINE.auth) ONLINE.auth.signOut().catch(() => {}); setOnlineStatus('off'); }
@@ -361,7 +369,11 @@ async function syncMemberAccounts(onProgress) {
       await auth2.signOut().catch(() => {});
       await ONLINE.fs.collection('roles').doc(uid).set({ code: m.code, role: onlineRoleFor(m), nom: memberName(m) });
       m.uid = uid;
-    } catch (e) { await auth2.signOut().catch(() => {}); res.erreurs.push(e.code === 'unie/old-password-unknown' ? e.message : m.code + ' : ' + errText(e)); }
+    } catch (e) {
+      await auth2.signOut().catch(() => {});
+      if (/too-many-requests/.test(e.code || '')) { res.erreurs.push('Firebase bloque les essais pour un moment (trop d’essais). Attendez 30 minutes, puis cliquez à nouveau : les comptes déjà faits ne sont pas refaits.'); break; }
+      res.erreurs.push(e.code === 'unie/old-password-unknown' ? e.message : m.code + ' : ' + errText(e));
+    }
   }
   saveDB(); schedulePush();
   return res;
@@ -397,7 +409,8 @@ async function signInMemberAccount(auth2, m) {
     if (!/invalid-credential|wrong-password|invalid-login/.test(e.code || '')) throw e;
   }
   const tries = [st.pwds[m.code]].concat((st.oldPwds[m.code] || []).slice().reverse(), [m.code.toLowerCase(), m.code]).filter((p, i, a) => p && p !== newPwd && a.indexOf(p) === i);
-  for (const p of tries) {
+  for (const p of tries.slice(0, 3)) {
+    await new Promise((r) => setTimeout(r, 700)); // pas d'essais en rafale (Firebase bloquerait la connexion)
     let c; try { c = await auth2.signInWithEmailAndPassword(fbEmail(m.code), fbPwd(p)); } catch (e) { if (/too-many-requests/.test(e.code || '')) throw e; continue; }
     await c.user.updatePassword(fbPwd(newPwd)); rememberOnlinePwd(m.code, newPwd); return c;
   }
@@ -474,7 +487,7 @@ ACTIONS.onlineSeen = () => {
           (x.s ? esc(fmtDT(new Date(x.s.last_seen).toISOString())) + ' <span class="muted">(' + ago(x.s.last_seen) + ')</span>' : '<span class="badge b-grey">jamais</span>') + '</td><td>' + (x.s ? esc(app[x.s.app] || x.s.app || '') : '') + '</td></tr>')) });
   }).catch((e) => toast(errText(e), 'err'));
 };
-ACTIONS.onlineNow = () => { goOnline().then(() => render()); };
+ACTIONS.onlineNow = () => { ONLINE.badPwd = false; goOnline(true).then(() => render()); };
 ACTIONS.onlineAccounts = () => {
   if (!ONLINE.who) { toast('Connectez-vous d’abord en ligne (Internet + compte admin).', 'err'); goOnline(); return; }
   toast('Création des comptes en ligne… gardez l’application ouverte.', 'warn');
