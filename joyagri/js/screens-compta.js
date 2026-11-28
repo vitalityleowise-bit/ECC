@@ -431,17 +431,20 @@
       address: U.field('Adresse', 'text', s.address), nif: U.field('NIF', 'text', s.nif), ninu: U.field('NINU', 'text', s.ninu), rc: U.field("N° d'immatriculation", 'text', s.rc),
       footer: U.field('Texte en bas de la fiche', 'text', s.footer), prefix: U.field('Préfixe des fiches', 'text', s.slipPrefix), next: U.field('Prochain numéro de fiche', 'number', s.nextSlipNo),
       rate: U.field('Taux du dollar (HTG pour 1 USD)', 'number', s.usdRate ? J.fmtQty(s.usdRate / 100) : ''), width: U.field('Largeur du papier', 'select', s.ticketWidth, { options: [[58, '58 mm'], [80, '80 mm']] }),
-      mode: U.field("Mode d'impression", 'select', s.printMode, { options: [['browser', 'Impression du système (PC / Android)'], ['escpos', 'Imprimante thermique ESC/POS (Bluetooth via RawBT, ou pont Android)']] }),
+      mode: U.field("Mode d'impression", 'select', s.printMode, { options: [['escpos', 'Imprimante thermique Bluetooth ESC/POS (via RawBT)'], ['browser', 'Impression du système (PC / Android)']] }),
+      model: U.field("Modèle d'imprimante", 'text', s.printerModel),
+      acc: U.field('Accents sur le ticket thermique', 'select', s.escposAccents, { options: [['ascii', 'Sans accents (sûr : é → e)'], ['cp858', 'Avec accents (page PC858, si l’imprimante le supporte)']] }),
       maxd: U.field('Réduction maximale du vendeur (%)', 'number', s.sellerMaxDiscountPct), days: U.field('Délai de crédit par défaut (jours)', 'number', s.creditDefaultDays),
       loyal: U.field('1 point fidélité tous les', 'money', s.loyaltyPer),
     };
     const chk = (label, key) => { const el = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!s[key] }), label); el.key = key; return el; };
+    const pchecks = [chk('Imprimer le logo sur le ticket thermique', 'escposLogo'), chk('Couper le papier (imprimante 80 mm avec massicot)', 'escposCut')];
     const checks = [chk('Activer le dollar US (USD)', 'usdEnabled'), chk('Autoriser la vente sans stock (déconseillé)', 'allowNegativeStock'), chk('Le vendeur peut déclarer les pertes', 'sellerCanDeclareLoss'), chk('Programme de fidélité (points)', 'loyaltyEnabled')];
     const logoImg = h('img', { src: A.logo(), style: { width: '90px', height: '90px', borderRadius: '50%', border: '1px solid var(--ligne)' } });
     const save = U.safe(() => {
       Object.assign(s, { name: f.name.get(), slogan: f.slogan.get(), owner: f.owner.get(), phone: f.phone.get(), address: f.address.get(), nif: f.nif.get(), ninu: f.ninu.get(), rc: f.rc.get(), footer: f.footer.get(), slipPrefix: f.prefix.get() || 'F',
-        nextSlipNo: Math.max(1, Math.round(f.next.get())), usdRate: J.toC(f.rate.input.value), ticketWidth: Number(f.width.get()), printMode: f.mode.get(), sellerMaxDiscountPct: f.maxd.get(), creditDefaultDays: Math.round(f.days.get()) || 15, loyaltyPer: f.loyal.get() || 100000 });
-      checks.forEach((c) => { s[c.key] = c.querySelector('input').checked; });
+        nextSlipNo: Math.max(1, Math.round(f.next.get())), usdRate: J.toC(f.rate.input.value), ticketWidth: Number(f.width.get()), printMode: f.mode.get(), printerModel: f.model.get(), escposAccents: f.acc.get(), sellerMaxDiscountPct: f.maxd.get(), creditDefaultDays: Math.round(f.days.get()) || 15, loyaltyPer: f.loyal.get() || 100000 });
+      checks.concat(pchecks).forEach((c) => { s[c.key] = c.querySelector('input').checked; });
       J.save(); U.toast('Paramètres enregistrés.', 'ok'); A.render();
     });
     const demoSale = () => ({ no: J.nextSlipNo(), date: J.nowISO(), type: 'vente', status: 'valide', sellerName: A.user.name, client: { name: 'Client de passage' }, lines: [{ kind: 'product', name: 'Test d’impression — Vanille', unit: 'cornet', qty: 2, unitPrice: 5000, priceType: 'detail', gross: 10000, disc: 0, total: 10000 }], gross: 10000, totalDisc: 0, total: 10000, payments: [{ amount: 10000, mode: 'cash', atSale: true, date: J.nowISO() }] });
@@ -449,9 +452,12 @@
       h('div', { class: 'card' }, h('h2', null, 'Entreprise'), h('div', { class: 'row', style: { gap: '16px', alignItems: 'center', marginBottom: '12px' } }, logoImg,
         h('div', { class: 'row' }, h('button', { class: 'btn sm light', onclick: async () => { const d = await U.pickImage(600); if (d) { s.logo = d; logoImg.src = d; J.save(); } } }, icon('image'), 'Changer le logo'), s.logo ? h('button', { class: 'btn sm ghost', onclick: () => { s.logo = null; J.save(); A.render(); } }, 'Logo d’origine') : null)),
         h('div', { class: 'grid g2 stack' }, f.name, f.slogan, f.owner, f.phone), f.address, h('div', { class: 'grid g3 stack' }, f.nif, f.ninu, f.rc)),
-      h('div', { class: 'card' }, h('h2', null, 'Fiche de vente et impression'), f.footer, h('div', { class: 'grid g2 stack' }, f.prefix, f.next, f.width, f.mode),
+      h('div', { class: 'card' }, h('h2', null, 'Fiche de vente et impression', h('button', { class: 'btn sm gold', onclick: () => {
+        Object.assign(s, { printerModel: 'PT-210', ticketWidth: 58, printMode: 'escpos', escposAccents: 'ascii', escposLogo: true, escposCut: false });
+        J.save(); U.toast('Réglages PT-210 appliqués (58 mm, Bluetooth, ESC/POS).', 'ok'); A.render();
+      } }, icon('print'), 'Préréglage PT-210')), f.footer, h('div', { class: 'grid g2 stack' }, f.prefix, f.next, f.width, f.mode, f.model, f.acc), pchecks,
         h('div', { class: 'row' }, h('button', { class: 'btn sm light', onclick: () => J.print.printHTML(J.print.ticketHTML(demoSale()), Number(f.width.get())) }, icon('print'), 'Test ticket'), h('button', { class: 'btn sm light', onclick: U.safe(() => J.print.sendEscpos(demoSale())) }, icon('print'), 'Test ESC/POS')),
-        h('p', { class: 'small muted' }, 'Android : installez l’application gratuite « RawBT » et associez l’imprimante Bluetooth, puis choisissez le mode ESC/POS. PC Windows : installez le pilote de l’imprimante et utilisez l’impression du système.')),
+        h('div', { class: 'alert green', style: { marginTop: '10px' } }, icon('print'), h('span', null, h('b', null, 'PT-210 sur Android : '), '1) Allumez l’imprimante (bouton rond). 2) Réglages du téléphone → Bluetooth → associez « PT-210 » (code 0000 ou 1234). 3) Installez l’application gratuite « RawBT » (Play Store), choisissez l’imprimante PT-210 et le mode 58 mm. 4) Dans JOYAGRI, touchez « Imprimer » sur la fiche : RawBT imprime le ticket.'))),
       h('div', { class: 'card' }, h('h2', null, 'Règles de vente'), h('div', { class: 'grid g2 stack' }, f.maxd, f.days, f.rate, f.loyal), checks),
       h('div', { class: 'row end' }, h('button', { class: 'btn light', onclick: () => U.download('profil-entreprise.json', JSON.stringify({ profile: true, settings: Object.assign({}, s, { nextSlipNo: undefined }) }, null, 2), 'application/json') }, icon('download'), 'Exporter le profil'), h('button', { class: 'btn gold', onclick: save }, icon('save'), 'Enregistrer')));
   };

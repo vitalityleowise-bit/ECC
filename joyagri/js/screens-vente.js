@@ -244,8 +244,10 @@
     const rest = J.saleRest(sale);
     const prev = h('div', { class: 'preview-ticket', html: J.print.ticketHTML(sale) });
     const acts = h('div', { class: 'grid g2', style: { marginTop: '12px' } },
-      h('button', { class: 'btn', onclick: () => J.print.printHTML(J.print.ticketHTML(sale), s.ticketWidth) }, icon('print'), `Ticket ${s.ticketWidth} mm`),
-      s.printMode === 'escpos' ? h('button', { class: 'btn', onclick: U.safe(async () => { const how = await J.print.sendEscpos(sale); U.toast(how === 'rawbt' ? 'Envoyé à RawBT (imprimante Bluetooth).' : 'Envoyé à l’imprimante.', 'ok'); }) }, icon('print'), 'Imprimante thermique') : null,
+      s.printMode === 'escpos'
+        ? h('button', { class: 'btn gold', onclick: U.safe(async () => { const how = await J.print.sendEscpos(sale); U.toast(how === 'rawbt' ? `Envoyé à ${s.printerModel || 'l’imprimante'} par RawBT.` : 'Envoyé à l’imprimante.', 'ok'); }) }, icon('print'), `Imprimer (${s.printerModel || 'thermique'})`)
+        : h('button', { class: 'btn', onclick: () => J.print.printHTML(J.print.ticketHTML(sale), s.ticketWidth) }, icon('print'), `Ticket ${s.ticketWidth} mm`),
+      s.printMode === 'escpos' ? h('button', { class: 'btn light', onclick: () => J.print.printHTML(J.print.ticketHTML(sale), s.ticketWidth) }, icon('print'), 'Impression système') : null,
       h('button', { class: 'btn light', onclick: () => J.print.printHTML(J.print.invoiceHTML(sale), 'A5') }, icon('receipt'), 'Facture A5'),
       h('button', { class: 'btn light', onclick: () => J.print.printHTML(J.print.invoiceHTML(sale), 'A4') }, icon('receipt'), 'Facture A4'),
       h('button', { class: 'btn light', onclick: () => J.print.openWhatsApp(sale.client.phone, J.print.whatsappText(sale)) }, icon('chat'), 'WhatsApp (texte)'),

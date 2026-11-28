@@ -152,8 +152,11 @@
   const CP858 = { 'Ç': 0x80, 'ü': 0x81, 'é': 0x82, 'â': 0x83, 'ä': 0x84, 'à': 0x85, 'ç': 0x87, 'ê': 0x88, 'ë': 0x89, 'è': 0x8a, 'ï': 0x8b, 'î': 0x8c, 'É': 0x90, 'ô': 0x93, 'ö': 0x94, 'û': 0x96, 'ù': 0x97, 'Ô': 0xe2, 'È': 0xd4, 'Ê': 0xd2, 'À': 0xb7, 'Â': 0xb6, 'Î': 0xd7, 'Û': 0xea, '«': 0xae, '»': 0xbb, '°': 0xf8, '€': 0xd5 };
   const enc = (str) => {
     const out = [];
+    // Mode « sans accents » : é → e, ç → c… (lisible sur toutes les imprimantes bon marché comme la PT-210)
+    const ascii = S().escposAccents !== 'cp858';
+    if (ascii) str = String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[«»]/g, '"').replace(/°/g, 'o').replace(/€/g, 'EUR');
     String(str).replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/[  ]/g, ' ').replace(/[–—]/g, '-').replace(/≥/g, '>=').replace(/≈/g, '~').replace(/×/g, 'x').replace(/·/g, '-')
-      .split('').forEach((ch) => { const c = ch.charCodeAt(0); out.push(c < 128 ? c : CP858[ch] || 0x3f); });
+      .split('').forEach((ch) => { const c = ch.charCodeAt(0); out.push(c < 128 ? c : (!ascii && CP858[ch]) || 0x3f); });
     return out;
   };
   const wrap = (text, w) => {
@@ -195,16 +198,24 @@
   });
   Pr.escpos = async (sale, width) => {
     const w = (width || S().ticketWidth) === 58 ? 32 : 48;
-    const b = [0x1b, 0x40, 0x1b, 0x74, 19]; // init + page de code PC858 (accents français)
+    const st = S();
+    const b = [0x1b, 0x40]; // initialisation
+    if (st.escposAccents === 'cp858') b.push(0x1b, 0x74, 19); // page de code PC858 (accents français)
     const align = (n) => b.push(0x1b, 0x61, n);
     const bold = (on) => b.push(0x1b, 0x45, on ? 1 : 0);
     const size = (big) => b.push(0x1d, 0x21, big ? 0x11 : 0x00);
     const line = (s) => { b.push(...enc(s), 0x0a); };
     for (const r of Pr.rows(sale)) {
-      if (r.t === 'logo') { align(1); b.push(...(await rasterLogo(w === 32 ? 192 : 256))); continue; }
+      if (r.t === 'logo') { if (st.escposLogo !== false) { align(1); b.push(...(await rasterLogo(w === 32 ? 192 : 256))); } continue; }
       if (r.t === 'hr') { align(0); line('-'.repeat(w)); continue; }
       bold(r.b);
       if (r.t === 'c') { align(1); size(r.big && w === 48); wrap(r.v, r.big && w === 48 ? w / 2 : w).forEach(line); size(false); }
+      else if (r.t === 'lr' && r.big) { // TOTAL : double hauteur, lisible même sur 58 mm
+        align(0); b.push(0x1d, 0x21, 0x01);
+        const right = String(r.z); const left = String(r.a);
+        line(left.length + right.length + 1 <= w ? left + ' '.repeat(w - left.length - right.length) + right : left + ' ' + right);
+        b.push(0x1d, 0x21, 0x00);
+      }
       else if (r.t === 'txt') { align(0); wrap(r.v, w).forEach(line); }
       else {
         align(0);
@@ -215,7 +226,8 @@
       }
       bold(false);
     }
-    b.push(0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x42, 0x00); // avance + coupe papier
+    b.push(0x0a, 0x0a, 0x0a);
+    if (w === 48 && st.escposCut) b.push(0x1d, 0x56, 0x42, 0x00); // coupe papier (80 mm avec massicot seulement ; la PT-210 n'en a pas)
     return new Uint8Array(b);
   };
   const b64 = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s); };

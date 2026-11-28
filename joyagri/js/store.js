@@ -11,8 +11,8 @@
     settings: {
       name: 'JOYAGRI', slogan: 'Cultiver aujourd’hui, nourrir demain', owner: '', nif: '', ninu: '', rc: '',
       address: '', phone: '', footer: 'Merci pour votre achat !', slipPrefix: 'F', nextSlipNo: 1,
-      purchasePrefix: 'A', nextPurchaseNo: 1, usdEnabled: false, usdRate: 0, ticketWidth: 80,
-      sellerMaxDiscountPct: 10, allowNegativeStock: false, printMode: 'browser', logo: null,
+      purchasePrefix: 'A', nextPurchaseNo: 1, usdEnabled: false, usdRate: 0, ticketWidth: 58,
+      sellerMaxDiscountPct: 10, allowNegativeStock: false, printMode: 'escpos', escposAccents: 'ascii', escposLogo: true, escposCut: false, printerModel: 'PT-210', logo: null,
       sellerCanDeclareLoss: false, creditDefaultDays: 15, loyaltyEnabled: true, loyaltyPer: 100000,
     },
     users: [], clients: [], products: [], services: [], suppliers: [],
